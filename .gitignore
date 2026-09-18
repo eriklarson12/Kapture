@@ -3,9 +3,10 @@
 .swiftpm/
 Package.resolved
 
-# Xcode
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
+# Xcode. The project is generated from project.yml by XcodeGen, so the
+# .xcodeproj itself is a build artifact and never committed.
+*.xcodeproj/
+*.xcworkspace/
 DerivedData/
 *.xcuserstate
 *.moved-aside

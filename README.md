@@ -40,6 +40,7 @@ Geometry is expressed in points, where one point is 1/72 inch, and resolution en
 
 - macOS 14 or later
 - Xcode 16 or later
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen), to generate the app project
 
 Xcode is required to run the tests and to build the app. The engine alone builds with the Command Line Tools.
 
@@ -48,9 +49,16 @@ Xcode is required to run the tests and to build the app. The engine alone builds
 ```sh
 git clone https://github.com/eriklarson/Kapture.git
 cd Kapture
-swift build     # builds the engine
-swift test      # runs the test suite (requires Xcode)
+
+swift build                 # build the engine
+swift test                  # run the test suite
+
+brew install xcodegen
+xcodegen generate           # produces Kapture.xcodeproj
+open Kapture.xcodeproj
 ```
+
+The Xcode project is generated from `project.yml` and is not committed, so build settings are edited there rather than in Xcode. Regenerating is idempotent.
 
 ## Roadmap
 
