@@ -13,7 +13,7 @@ public enum ImageCodecError: Error, Equatable {
 ///
 /// PNG rather than HEIC, deliberately: the round trip is pixel-exact, which is
 /// what makes the frame store testable by comparing images rather than by
-/// trusting the encoder. HEIC would cut a strip's roughly 20 MB of frames by
+/// trusting the encoder. HEIC would cut a strip's roughly 8 MB of frames by
 /// about tenfold and is a change behind this API alone, if a long party ever
 /// makes that matter.
 public enum ImageCodec {
