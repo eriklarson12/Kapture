@@ -1,27 +1,10 @@
 import KaptureKit
 import SwiftUI
 
-/// The camera feed, the countdown, and the flash.
-///
-/// The single-shot path here exists to exercise 1.1 through 1.3 end to end.
-/// Driving a full N-shot run is item 1.4 and belongs in a sequence driver, not
-/// in a view.
+/// The only region that ever shows an image: the live feed during a run, the
+/// shot just taken during a review beat, and the finished strip after.
 struct ViewportView: View {
-    let camera: AVFoundationCamera
-    let template: StripTemplate
-    let sequence: CaptureSequence
-
-    enum Status: Equatable {
-        case starting
-        case live
-        case failed(String)
-    }
-
-    @State private var status: Status = .starting
-    @State private var countdown: Int?
-    @State private var isFlashing = false
-    @State private var isCapturing = false
-    @State private var lastCapture: CGImage?
+    let model: BoothModel
 
     var body: some View {
         ZStack {
@@ -29,94 +12,143 @@ struct ViewportView: View {
             // image. docs/design-system.md.
             Color.black
 
-            feed
+            content
 
             if let countdown {
                 CountdownOverlay(value: countdown)
             }
             FlashOverlay(isFlashing: isFlashing)
         }
-        .overlay(alignment: .topTrailing) { lastCaptureThumbnail }
-        .overlay(alignment: .bottom) { shutter }
-        .task { await startCamera() }
-        .onDisappear { camera.stop() }
+        .overlay(alignment: .top) { progress }
+        .overlay(alignment: .bottom) { controls }
+        .overlay(alignment: .center) { failure }
+        .task { await model.startCamera() }
+        .onDisappear { model.stopCamera() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let strip = model.strip {
+            StripPreviewView(image: strip.image)
+        } else if let reviewing {
+            // Mirrored to match the preview. The subject just saw themselves
+            // one way round; the review beat must not flip them.
+            Image(decorative: reviewing, scale: 1)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .scaleEffect(x: -1, y: 1)
+                .clipped()
+        } else {
+            feed
+        }
     }
 
     @ViewBuilder
     private var feed: some View {
-        switch status {
+        switch model.cameraStatus {
         case .starting:
             ProgressView()
                 .controlSize(.small)
         case .live:
-            CameraPreview(session: camera.session)
+            CameraPreview(session: model.camera.session)
         case .failed(let message):
-            VStack(spacing: 8) {
-                Text("Camera unavailable")
-                    .font(.system(size: 13, weight: .medium))
-                Text(message)
-                    .font(.system(size: 11))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: 320)
-            }
-            .foregroundStyle(.white)
-            .padding()
+            notice(title: "Camera unavailable", detail: message)
+        }
+    }
+
+    /// Camera and export failures are shown as text, never swallowed.
+    /// docs/conventions.md.
+    private func notice(title: String, detail: String) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+            Text(detail)
+                .font(.system(size: 11))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.65))
+                .frame(maxWidth: 320)
+        }
+        .foregroundStyle(.white)
+        .padding()
+    }
+
+    // MARK: - Run state
+
+    private var countdown: Int? {
+        if case .countingDown(_, let secondsRemaining) = model.runner.state {
+            return secondsRemaining
+        }
+        return nil
+    }
+
+    private var isFlashing: Bool {
+        if case .flashing = model.runner.state { return true }
+        return false
+    }
+
+    private var reviewing: CGImage? {
+        guard case .reviewing(let index) = model.runner.state,
+              index < model.runner.frames.count else { return nil }
+        return model.runner.frames[index].image
+    }
+
+    private var shotNumber: Int? {
+        switch model.runner.state {
+        case .countingDown(let frame, _), .flashing(let frame), .reviewing(let frame):
+            frame + 1
+        default:
+            nil
+        }
+    }
+
+    // MARK: - Chrome
+
+    @ViewBuilder
+    private var failure: some View {
+        if let errorMessage = model.errorMessage {
+            notice(title: "Something went wrong", detail: errorMessage)
+                .background(.black.opacity(0.75))
+                .onTapGesture { model.errorMessage = nil }
         }
     }
 
     @ViewBuilder
-    private var lastCaptureThumbnail: some View {
-        if let lastCapture {
-            Image(decorative: lastCapture, scale: 1)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 96, height: 72)
-                .clipped()
-                .padding(12)
-                .accessibilityLabel("Most recent capture")
+    private var progress: some View {
+        if let shotNumber {
+            Text("\(shotNumber) of \(model.sequence.frameCount)")
+                .font(.system(size: 12).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.75))
+                .padding(.top, 20)
+                .accessibilityLabel("Shot \(shotNumber) of \(model.sequence.frameCount)")
         }
     }
 
-    private var shutter: some View {
-        Button {
-            Task { await captureOnce() }
-        } label: {
-            Text(isCapturing ? "Capturing" : "Take photo")
-                .frame(minWidth: 120, minHeight: 44)
+    private var controls: some View {
+        HStack(spacing: 12) {
+            if model.strip != nil {
+                Button("Retake") { model.retake() }
+                    .frame(minWidth: 110, minHeight: 44)
+                    .keyboardShortcut(.escape, modifiers: [])
+
+                Button(model.isExporting ? "Saving" : "Save PNG") {
+                    Task { await model.exportStrip() }
+                }
+                .frame(minWidth: 110, minHeight: 44)
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(model.isExporting)
+            } else {
+                Button(shutterLabel) { Task { await model.capture() } }
+                    .frame(minWidth: 160, minHeight: 44)
+                    .keyboardShortcut(.space, modifiers: [])
+                    .disabled(!model.canCapture)
+            }
         }
-        .disabled(status != .live || isCapturing)
-        .keyboardShortcut(.space, modifiers: [])
         .padding(.bottom, 24)
     }
 
-    private func startCamera() async {
-        do {
-            try await camera.start()
-            status = .live
-        } catch {
-            status = .failed(error.localizedDescription)
-        }
-    }
-
-    private func captureOnce() async {
-        isCapturing = true
-        defer { isCapturing = false }
-
-        for remaining in stride(from: sequence.countdownSeconds, through: 1, by: -1) {
-            countdown = remaining
-            try? await Task.sleep(for: .seconds(1))
-        }
-        countdown = nil
-
-        isFlashing = true
-        try? await Task.sleep(for: FlashOverlay.duration)
-        isFlashing = false
-
-        do {
-            lastCapture = try await camera.captureStill()
-        } catch {
-            status = .failed(error.localizedDescription)
-        }
+    private var shutterLabel: String {
+        if model.isBuilding { return "Building strip" }
+        if model.isRunning { return "Hold still" }
+        return "Take \(model.sequence.frameCount) photos"
     }
 }

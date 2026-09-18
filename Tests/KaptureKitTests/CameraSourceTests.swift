@@ -10,6 +10,9 @@ final class StubCamera: CameraSource {
     private(set) var isRunning = false
     private(set) var captureCount = 0
     var failNextCapture: CaptureError?
+    /// Zero-based ordinal of the capture that should throw, for driving a
+    /// mid-run failure through `CaptureRunner`.
+    var failAtCapture: Int?
 
     func start() async throws {
         isRunning = true
@@ -24,6 +27,9 @@ final class StubCamera: CameraSource {
         if let failNextCapture {
             self.failNextCapture = nil
             throw failNextCapture
+        }
+        if failAtCapture == captureCount {
+            throw CaptureError.captureFailed("stub failure")
         }
         captureCount += 1
         return TestImage.solid(width: 640, height: 480)

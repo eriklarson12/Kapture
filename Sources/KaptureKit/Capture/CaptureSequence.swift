@@ -16,7 +16,13 @@ public struct CaptureSequence: Codable, Equatable, Sendable {
 
     public static let standard = CaptureSequence()
 
-    /// Wall-clock length of a full run, for the progress indicator.
+    /// How long the capture flash is held. It lives here rather than in the
+    /// overlay because `CaptureRunner` has to wait on it, and one number in one
+    /// place is the only way the driver and the view stay in step.
+    public static let flashSeconds = 0.08
+
+    /// Wall-clock length of a full run, for the progress indicator. Excludes
+    /// flash time, which is under a third of a second across a whole run.
     public var totalDuration: Double {
         let perFrame = Double(countdownSeconds) + reviewSeconds
         return perFrame * Double(frameCount) - reviewSeconds

@@ -7,6 +7,9 @@ import SwiftUI
 /// A full-screen white flash is a genuine hazard for photosensitive users, so
 /// when Reduce Motion is set this degrades to a border pulse instead. That
 /// check is required by docs/design-system.md, not optional polish.
+///
+/// How long it is held is `CaptureSequence.flashSeconds`: `CaptureRunner` has
+/// to wait on that value, so it lives in the engine rather than here.
 struct FlashOverlay: View {
     let isFlashing: Bool
 
@@ -26,8 +29,4 @@ struct FlashOverlay: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
-
-    /// How long the flash is held at full strength. Short enough to read as a
-    /// shutter rather than a stutter.
-    static let duration: Duration = .milliseconds(80)
 }

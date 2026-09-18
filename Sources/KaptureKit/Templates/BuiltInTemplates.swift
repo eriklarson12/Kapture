@@ -41,6 +41,13 @@ public enum BuiltInTemplates {
 
     public static let all: [StripTemplate] = [classicStrip, tripleStrip, wideStrip]
 
+    /// Keyed for `RecipeRenderer`, which resolves a recipe's `templateID`.
+    /// Item 5.2 adds user templates by adding entries, not by adding a
+    /// second lookup path.
+    public static let byID: [String: StripTemplate] = Dictionary(
+        uniqueKeysWithValues: all.map { ($0.id, $0) }
+    )
+
     public static func template(id: String) -> StripTemplate? {
         all.first { $0.id == id }
     }

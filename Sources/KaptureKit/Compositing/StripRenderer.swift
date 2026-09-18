@@ -14,7 +14,15 @@ public struct StripRenderer {
 
     /// Renders `frames` into `template`. Scale 1 gives point-for-pixel preview
     /// geometry; use `template.scale(forDPI:)` for a print export.
-    public func render(frames: [CGImage], template: StripTemplate, scale: CGFloat = 1) throws -> CGImage {
+    ///
+    /// `mirrored` flips each photo about its own centre rather than flipping
+    /// the canvas, so the border and the footer stay the right way round.
+    public func render(
+        frames: [CGImage],
+        template: StripTemplate,
+        scale: CGFloat = 1,
+        mirrored: Bool = false
+    ) throws -> CGImage {
         guard template.isValid else { throw StripRenderError.invalidTemplate }
         guard frames.count == template.frameCount else {
             throw StripRenderError.frameCountMismatch(expected: template.frameCount, actual: frames.count)
@@ -58,6 +66,11 @@ public struct StripRenderer {
                 context.clip()
             } else {
                 context.clip(to: rect)
+            }
+            if mirrored {
+                context.translateBy(x: rect.midX, y: 0)
+                context.scaleBy(x: -1, y: 1)
+                context.translateBy(x: -rect.midX, y: 0)
             }
             context.draw(image, in: Self.aspectFillRect(for: image, in: rect))
             context.restoreGState()

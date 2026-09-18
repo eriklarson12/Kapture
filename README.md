@@ -6,7 +6,7 @@ Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Status
 
-Early. The compositing engine is built and verified; the camera and UI layers are in progress. See Roadmap below for what works and what does not.
+The core loop works: press a button, get four photos on a countdown, see the strip, save a 300 dpi PNG. Customization is next. See Roadmap below.
 
 ## How it works
 
@@ -22,17 +22,21 @@ That one decision buys a lot:
 ## Architecture
 
 ```
-KaptureKit/          engine: models, layout math, renderer
-  Model/             StripTemplate, StripRecipe, CaptureFrame, CaptureSequence
-  Compositing/       StripRenderer, PhotoFilter
-  Capture/           CameraSource protocol
+KaptureKit/          engine: models, layout math, renderer, storage
+  Model/             StripTemplate, StripRecipe, CaptureFrame, RGBA
+  Capture/           CameraSource protocol, CaptureSequence, CaptureRunner
+  Compositing/       StripRenderer, RecipeRenderer, PhotoFilter
+  Storage/           StripStore, ImageCodec
   Templates/         built-in layouts
 
 App/                 SwiftUI shell
+  BoothModel.swift           app state and policy
   AVFoundationCamera.swift   the only file that touches AVFoundation
 ```
 
-The engine imports only Foundation, CoreGraphics, and CoreImage. It has no idea a camera or a window exists, which is what makes every layout decision testable without hardware.
+The engine contains no UI framework. It has no idea a camera or a window exists, which is what makes every layout decision testable without hardware. The capture driver lives there too, waiting through an injected clock, so a four shot sequence can be tested in milliseconds rather than sat through.
+
+A strip on disk is a single package directory holding its recipe and its frames. Deleting a strip is one filesystem operation, and no frame is ever shared between two strips.
 
 Geometry is expressed in points, where one point is 1/72 inch, and resolution enters only at render time. The same template drives both the on-screen preview and a 300 dpi print export. The classic 2x6 inch strip renders to exactly 600x1800 pixels.
 
@@ -64,15 +68,12 @@ The Xcode project is generated from `project.yml` and is not committed, so build
 
 Working:
 
+- Camera capture with a live mirrored preview
+- Countdown, capture flash, and a review beat between shots
 - Strip layout engine with aspect-fill cropping and scaled print export
 - Three built-in templates
-- Recipe and template serialization
-
-In progress:
-
-- Camera capture and live preview
-- Countdown and capture sequence
-- PNG export
+- Strips stored on disk as re-renderable recipes
+- PNG export at 300 dpi, a true 2x6 inches
 
 Planned:
 

@@ -22,4 +22,52 @@ enum TestImage {
     static func frames(_ count: Int, width: Int = 640, height: Int = 480) -> [CGImage] {
         (0..<count).map { _ in solid(width: width, height: height) }
     }
+
+    /// Black on the left half, white on the right, uniform top to bottom. The
+    /// vertical uniformity is deliberate: a mirror test can then sample at any
+    /// row without depending on which way a bitmap buffer is laid out.
+    static func asymmetric(width: Int = 640, height: Int = 480) -> CGImage {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width / 2, height: height))
+        context.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: width / 2, y: 0, width: width - width / 2, height: height))
+        return context.makeImage()!
+    }
+
+    /// Raw RGBA bytes in a fixed layout, so two images can be compared without
+    /// depending on the format a decoder happened to choose.
+    static func pixels(_ image: CGImage) -> [UInt8] {
+        let bytesPerRow = image.width * 4
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * image.height)
+        buffer.withUnsafeMutableBytes { raw in
+            let context = CGContext(
+                data: raw.baseAddress,
+                width: image.width,
+                height: image.height,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+            context.draw(
+                image,
+                in: CGRect(x: 0, y: 0, width: image.width, height: image.height)
+            )
+        }
+        return buffer
+    }
+
+    static func red(_ image: CGImage, x: Int, y: Int) -> UInt8 {
+        pixels(image)[y * image.width * 4 + x * 4]
+    }
 }
