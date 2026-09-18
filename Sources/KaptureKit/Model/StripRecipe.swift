@@ -37,11 +37,15 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         self.mirrorOutput = mirrorOutput
     }
 
-    /// Rounds to the millisecond, the finest resolution the stored ISO 8601
-    /// timestamp can express. Without this a recipe decoded from disk compares
-    /// unequal to the one in memory, which would break undo, dedupe, and any
-    /// test that asserts a round-trip.
+    /// Normalizes a timestamp to the value its own serialized form decodes to.
+    ///
+    /// Rounding to the millisecond is not enough: `ISO8601DateFormatter` does
+    /// calendar math on the way back and lands on a neighbouring `Double`, so
+    /// 800000000.123 returns as 800000000.1229999 and a decoded recipe compares
+    /// unequal to the one in memory. Formatting and reparsing yields a fixed
+    /// point of the round trip, which is the only value guaranteed stable.
     static func storable(_ date: Date) -> Date {
-        Date(timeIntervalSinceReferenceDate: (date.timeIntervalSinceReferenceDate * 1000).rounded() / 1000)
+        let formatter = RecipeCoding.formatter()
+        return formatter.date(from: formatter.string(from: date)) ?? date
     }
 }

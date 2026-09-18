@@ -11,6 +11,33 @@ struct StripRecipeTests {
         #expect(try RecipeCoding.decoder().decode(StripRecipe.self, from: data) == recipe)
     }
 
+    /// One `Date()` can survive a broken round trip by luck, which is exactly
+    /// how the millisecond-rounding bug hid. Sweep instead.
+    @Test("round-trips 500 arbitrary timestamps exactly")
+    func manyTimestampsRoundTrip() throws {
+        let encoder = RecipeCoding.encoder()
+        let decoder = RecipeCoding.decoder()
+        for _ in 0..<500 {
+            let offset = Double.random(in: -2_000_000_000...2_000_000_000)
+            let recipe = StripRecipe(
+                createdAt: Date(timeIntervalSinceReferenceDate: offset),
+                templateID: BuiltInTemplates.classicStrip.id,
+                frameIDs: [UUID()]
+            )
+            let decoded = try decoder.decode(StripRecipe.self, from: encoder.encode(recipe))
+            #expect(decoded == recipe, "failed at offset \(offset)")
+        }
+    }
+
+    @Test("normalizing is idempotent")
+    func storableIsIdempotent() {
+        for _ in 0..<200 {
+            let date = Date(timeIntervalSinceReferenceDate: .random(in: -2_000_000_000...2_000_000_000))
+            let once = StripRecipe.storable(date)
+            #expect(StripRecipe.storable(once) == once)
+        }
+    }
+
     @Test("round-trips through JSON unchanged")
     func codableRoundTrip() throws {
         let recipe = StripRecipe(

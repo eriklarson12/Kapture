@@ -7,7 +7,7 @@ import Foundation
 /// strategy truncates fractional seconds, which makes a decoded recipe unequal
 /// to the one just saved; these keep the timestamp exact while staying readable.
 public enum RecipeCoding {
-    private static func formatter() -> ISO8601DateFormatter {
+    static func formatter() -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
