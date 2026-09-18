@@ -35,9 +35,9 @@ struct ViewportView: View {
             // one way round; the review beat must not flip them.
             Image(decorative: reviewing, scale: 1)
                 .resizable()
-                .aspectRatio(contentMode: .fill)
+                .scaledToFill()
                 .scaleEffect(x: -1, y: 1)
-                .clipped()
+                .modifier(PhotoFraming(aspect: model.template.photoAspect))
         } else {
             feed
         }
@@ -51,6 +51,7 @@ struct ViewportView: View {
                 .controlSize(.small)
         case .live:
             CameraPreview(session: model.camera.session)
+                .modifier(PhotoFraming(aspect: model.template.photoAspect))
         case .failed(let message):
             notice(title: "Camera unavailable", detail: message)
         }
@@ -150,5 +151,30 @@ struct ViewportView: View {
         if model.isBuilding { return "Building strip" }
         if model.isRunning { return "Hold still" }
         return "Take \(model.sequence.frameCount) photos"
+    }
+}
+
+/// Constrains a live region to the aspect each photo is cropped to.
+///
+/// Without this the feed fills the window while the strip crops to
+/// `photoAspect`, so the subject composes against one rectangle and gets
+/// another, losing roughly a fifth of the width with nothing on screen to
+/// warn them. Letterboxing on black is the whole fix: what is visible is
+/// exactly what reaches the strip.
+///
+/// The empty `Color` is what makes the box real. Applying `.aspectRatio` to a
+/// filling image instead measures the image, which reports a size larger than
+/// it was offered, and the region ends up neither the right shape nor clipped
+/// where it claims to be. A flexible view takes the ratio exactly; the content
+/// then overflows into it and is cut here, once, for every live region.
+private struct PhotoFraming: ViewModifier {
+    let aspect: CGFloat
+
+    func body(content: Content) -> some View {
+        Color.clear
+            .aspectRatio(aspect, contentMode: .fit)
+            .overlay { content }
+            .clipped()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

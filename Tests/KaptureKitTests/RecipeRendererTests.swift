@@ -93,4 +93,58 @@ struct RecipeRendererTests {
             }
         }
     }
+
+    @Test("a style override changes the paper the strip is printed on")
+    func styleOverridesBackground() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4), templateID: BuiltInTemplates.classicStrip.id
+            )
+            let plain = try RecipeRenderer(store: store).render(recipe)
+            // The very corner is border, never photo, so it is the paper.
+            #expect(TestImage.red(plain, x: 0, y: 0) == 255)
+
+            recipe.style = StripStyle(background: RGBA(red: 0, green: 0, blue: 0))
+            try store.update(recipe)
+            let dark = try RecipeRenderer(store: store).render(try store.load(id: recipe.id))
+            #expect(TestImage.red(dark, x: 0, y: 0) == 0)
+        }
+    }
+
+    @Test("a border override moves where the photos start")
+    func styleOverridesInset() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4), templateID: BuiltInTemplates.classicStrip.id
+            )
+            recipe.style = StripStyle(outerInset: 24)
+            try store.update(recipe)
+
+            let strip = try RecipeRenderer(store: store).render(recipe)
+            let template = BuiltInTemplates.classicStrip.applying(recipe.style)
+            let expectedWidth: CGFloat = 96
+            #expect(template.photoWidth == expectedWidth)
+
+            // Canvas size is unchanged; only the photos move inward.
+            #expect(strip.width == Int(BuiltInTemplates.classicStrip.canvasSize.width))
+            #expect(TestImage.red(strip, x: 20, y: strip.height / 2) == 255)
+            #expect(TestImage.red(strip, x: 30, y: strip.height / 2) != 255)
+        }
+    }
+
+    @Test("a stored caption reaches the rendered strip")
+    func rendersStoredCaption() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4), templateID: BuiltInTemplates.classicStrip.id
+            )
+            let bare = try RecipeRenderer(store: store).render(recipe)
+
+            recipe.caption = "Kapture"
+            try store.update(recipe)
+            let captioned = try RecipeRenderer(store: store).render(recipe)
+
+            #expect(TestImage.pixels(bare) != TestImage.pixels(captioned))
+        }
+    }
 }

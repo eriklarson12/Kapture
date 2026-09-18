@@ -19,6 +19,9 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
     public var cornerRadius: CGFloat
     public var background: RGBA
     public var foreground: RGBA
+    /// Caption size in points. 9pt in a 30pt band prints legibly at 300 dpi.
+    public var captionFontSize: CGFloat
+    public var captionAlignment: CaptionAlignment
 
     public init(
         id: String,
@@ -30,7 +33,9 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
         footerHeight: CGFloat,
         cornerRadius: CGFloat = 0,
         background: RGBA = .paper,
-        foreground: RGBA = .ink
+        foreground: RGBA = .ink,
+        captionFontSize: CGFloat = 9,
+        captionAlignment: CaptionAlignment = .center
     ) {
         self.id = id
         self.name = name
@@ -42,6 +47,8 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
         self.cornerRadius = cornerRadius
         self.background = background
         self.foreground = foreground
+        self.captionFontSize = captionFontSize
+        self.captionAlignment = captionAlignment
     }
 
     /// False when the chrome leaves no room for the photos it claims to hold.
@@ -55,6 +62,13 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
 
     public var photoWidth: CGFloat {
         canvasSize.width - outerInset * 2
+    }
+
+    /// The aspect every photo is cropped to. The live preview must be framed to
+    /// this, or the subject composes against the window while the strip uses
+    /// something narrower and the difference is lost with no warning.
+    public var photoAspect: CGFloat {
+        photoHeight > 0 ? photoWidth / photoHeight : 1
     }
 
     public var photoHeight: CGFloat {
@@ -83,6 +97,21 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
     public func footerRect() -> CGRect {
         guard isValid, footerHeight > 0 else { return .zero }
         return CGRect(x: outerInset, y: outerInset, width: photoWidth, height: footerHeight)
+    }
+
+    /// A copy with the style's set fields applied. Resolving overrides here is
+    /// what lets `StripRenderer` keep taking a finished template and never
+    /// learn that overrides exist.
+    public func applying(_ style: StripStyle?) -> StripTemplate {
+        guard let style else { return self }
+        var resolved = self
+        if let background = style.background { resolved.background = background }
+        if let foreground = style.foreground { resolved.foreground = foreground }
+        if let outerInset = style.outerInset { resolved.outerInset = outerInset }
+        if let cornerRadius = style.cornerRadius { resolved.cornerRadius = cornerRadius }
+        if let captionFontSize = style.captionFontSize { resolved.captionFontSize = captionFontSize }
+        if let captionAlignment = style.captionAlignment { resolved.captionAlignment = captionAlignment }
+        return resolved
     }
 
     /// Points are 1/72 inch, so this is the render scale that lands the canvas

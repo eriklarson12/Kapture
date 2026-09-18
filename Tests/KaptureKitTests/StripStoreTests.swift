@@ -112,4 +112,47 @@ struct StripStoreTests {
             }
         }
     }
+
+    @Test("update rewrites the recipe and leaves the frames alone")
+    func updateRewritesRecipe() throws {
+        try withStore { store in
+            var recipe = try store.save(frames: makeFrames(), templateID: "classic-strip")
+            let framesBefore = try store.loadFrames(for: recipe).map(TestImage.pixels)
+
+            recipe.caption = "Summer 2026"
+            recipe.style = StripStyle(background: RGBA(red: 0.9, green: 0.9, blue: 0.85))
+            try store.update(recipe)
+
+            let reloaded = try store.load(id: recipe.id)
+            #expect(reloaded == recipe)
+            #expect(reloaded.caption == "Summer 2026")
+            #expect(reloaded.style?.background?.blue == 0.85)
+
+            let framesAfter = try store.loadFrames(for: reloaded).map(TestImage.pixels)
+            #expect(framesAfter == framesBefore)
+        }
+    }
+
+    @Test("updating a strip that was never saved reports which one")
+    func updateUnknownStrip() throws {
+        try withStore { store in
+            let recipe = StripRecipe(templateID: "classic-strip", frameIDs: [UUID()])
+            #expect(throws: StripStoreError.notFound(recipe.id)) {
+                try store.update(recipe)
+            }
+        }
+    }
+
+    @Test("an updated strip keeps its place in the listing")
+    func updateKeepsListing() throws {
+        try withStore { store in
+            var recipe = try store.save(frames: makeFrames(), templateID: "classic-strip")
+            recipe.templateID = "wide-strip"
+            try store.update(recipe)
+
+            let listed = try store.listRecipes()
+            #expect(listed.count == 1)
+            #expect(listed.first?.templateID == "wide-strip")
+        }
+    }
 }

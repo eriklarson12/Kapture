@@ -16,12 +16,15 @@ public struct StripRenderer {
     /// geometry; use `template.scale(forDPI:)` for a print export.
     ///
     /// `mirrored` flips each photo about its own centre rather than flipping
-    /// the canvas, so the border and the footer stay the right way round.
+    /// the canvas, so the border and the footer stay the right way round. The
+    /// caption is the first thing that depends on that: it is drawn once, after
+    /// the photos, and is never affected by the flip.
     public func render(
         frames: [CGImage],
         template: StripTemplate,
         scale: CGFloat = 1,
-        mirrored: Bool = false
+        mirrored: Bool = false,
+        caption: String? = nil
     ) throws -> CGImage {
         guard template.isValid else { throw StripRenderError.invalidTemplate }
         guard frames.count == template.frameCount else {
@@ -74,6 +77,15 @@ public struct StripRenderer {
             }
             context.draw(image, in: Self.aspectFillRect(for: image, in: rect))
             context.restoreGState()
+        }
+
+        if let caption {
+            CaptionRenderer.draw(
+                caption,
+                in: template.footerRect(),
+                template: template,
+                context: context
+            )
         }
 
         guard let output = context.makeImage() else { throw StripRenderError.contextCreationFailed }

@@ -9,8 +9,9 @@ public enum RecipeRenderError: Error, Equatable {
 /// frames, composite. This is the payoff for ADR-003 — nothing was baked, so a
 /// strip can be re-rendered at any size, with any template, forever.
 ///
-/// Filters and captions are recorded in the recipe but not yet applied; those
-/// are items 2.4 and 2.3.
+/// Per-strip overrides in `recipe.style` are resolved here, so `StripRenderer`
+/// keeps taking a finished template. Filters are recorded but not yet applied;
+/// that is item 2.4.
 public struct RecipeRenderer: Sendable {
     private let store: StripStore
     private let templates: [String: StripTemplate]
@@ -29,13 +30,14 @@ public struct RecipeRenderer: Sendable {
 
     /// Scale 1 is preview geometry; `template.scale(forDPI: 300)` is a print.
     public func render(_ recipe: StripRecipe, scale: CGFloat = 1) throws -> CGImage {
-        let template = try template(for: recipe)
+        let template = try template(for: recipe).applying(recipe.style)
         let frames = try store.loadFrames(for: recipe)
         return try StripRenderer().render(
             frames: frames,
             template: template,
             scale: scale,
-            mirrored: recipe.mirrorOutput
+            mirrored: recipe.mirrorOutput,
+            caption: recipe.caption
         )
     }
 }

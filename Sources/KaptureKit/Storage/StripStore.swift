@@ -47,6 +47,7 @@ public struct StripStore: Sendable {
         templateID: String,
         filter: PhotoFilter = .none,
         caption: String? = nil,
+        style: StripStyle? = nil,
         mirrorOutput: Bool = false
     ) throws -> StripRecipe {
         let ordered = frames.sorted { $0.index < $1.index }
@@ -55,6 +56,7 @@ public struct StripStore: Sendable {
             frameIDs: ordered.map(\.id),
             filter: filter,
             caption: caption,
+            style: style,
             mirrorOutput: mirrorOutput
         )
 
@@ -88,6 +90,22 @@ public struct StripStore: Sendable {
         }
         try manager.moveItem(at: staging, to: destination)
         return recipe
+    }
+
+    /// Rewrites a package's recipe in place, leaving the frames alone. Every
+    /// edit after the shot goes through here: template, style, caption, mirror.
+    ///
+    /// A single small file needs no staging directory of its own; `.atomic`
+    /// already writes aside and renames. The directory staging in `save` exists
+    /// because a package is many files, not because a write is risky.
+    public func update(_ recipe: StripRecipe) throws {
+        let package = packageURL(for: recipe.id)
+        guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false)) else {
+            throw StripStoreError.notFound(recipe.id)
+        }
+        try RecipeCoding.encoder()
+            .encode(recipe)
+            .write(to: package.appending(path: "recipe.json"), options: .atomic)
     }
 
     public func load(id: UUID) throws -> StripRecipe {

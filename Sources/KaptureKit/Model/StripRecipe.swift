@@ -15,6 +15,9 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
     public var frameIDs: [UUID]
     public var filter: PhotoFilter
     public var caption: String?
+    /// Template fields this strip overrides. Optional, so a recipe written
+    /// before styling existed still decodes.
+    public var style: StripStyle?
     /// Whether the output is mirrored. Independent of the preview, which is
     /// always mirrored because that is what people expect to see of themselves.
     public var mirrorOutput: Bool
@@ -26,6 +29,7 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         frameIDs: [UUID],
         filter: PhotoFilter = .none,
         caption: String? = nil,
+        style: StripStyle? = nil,
         mirrorOutput: Bool = false
     ) {
         self.id = id
@@ -34,6 +38,7 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         self.frameIDs = frameIDs
         self.filter = filter
         self.caption = caption
+        self.style = style
         self.mirrorOutput = mirrorOutput
     }
 

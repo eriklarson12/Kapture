@@ -66,4 +66,15 @@ struct StripTemplateTests {
         let size = BuiltInTemplates.classicStrip.pixelSize(atDPI: 300)
         #expect(size == CGSize(width: 600, height: 1800))
     }
+
+    @Test("photo aspect is the shape the preview must be framed to")
+    func photoAspect() {
+        let template = BuiltInTemplates.classicStrip
+        #expect(template.photoWidth == 128)
+        #expect(template.photoHeight == 92)
+        #expect(abs(template.photoAspect - 128.0 / 92.0) < 0.0001)
+        // Narrower than a 16:9 camera, which is exactly why the viewport has to
+        // be constrained to it rather than to the window.
+        #expect(template.photoAspect < 16.0 / 9.0)
+    }
 }

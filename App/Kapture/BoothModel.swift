@@ -32,6 +32,11 @@ final class BoothModel {
     var isExporting = false
     var errorMessage: String?
 
+    /// Guards against an out-of-order render. Dragging a colour emits a stream
+    /// of edits, and a slow render landing after a fast one would show a strip
+    /// that no longer matches the recipe.
+    @ObservationIgnored private var renderGeneration = 0
+
     /// The template owns the shot count. Letting the sequence carry a second,
     /// independent count is how you get a three-shot run rendered into a
     /// four-frame strip, which the renderer rightly refuses.
@@ -47,6 +52,22 @@ final class BoothModel {
     /// editing the selected one's identity.
     var template: StripTemplate {
         BuiltInTemplates.template(id: templateID) ?? BuiltInTemplates.classicStrip
+    }
+
+    /// The template as the shown strip actually renders it: the base template
+    /// with this strip's overrides applied. The inspector displays these values,
+    /// so an untouched control shows what the template gives rather than blank.
+    var shownTemplate: StripTemplate {
+        let base = BuiltInTemplates.template(id: strip?.recipe.templateID ?? templateID)
+            ?? BuiltInTemplates.classicStrip
+        return base.applying(strip?.recipe.style)
+    }
+
+    /// A four-frame strip cannot be re-rendered into a three-frame template, so
+    /// while one is shown the picker offers only templates that can hold it.
+    var availableTemplates: [StripTemplate] {
+        guard let strip else { return BuiltInTemplates.all }
+        return BuiltInTemplates.all.filter { $0.frameCount == strip.recipe.frameIDs.count }
     }
 
     var isRunning: Bool {
@@ -99,6 +120,38 @@ final class BoothModel {
     func retake() {
         strip = nil
         runner.reset()
+    }
+
+    /// Picks the template for the next run, and re-renders the shown strip into
+    /// it when there is one.
+    func selectTemplate(_ id: String) async {
+        templateID = id
+        guard strip != nil else { return }
+        await restyle { $0.templateID = id }
+    }
+
+    /// The one path from an edited recipe to a visible, saved strip. Items 2.1,
+    /// 2.2 and 2.3 all route through here, so there is a single place that knows
+    /// how to re-render and persist.
+    func restyle(_ mutate: (inout StripRecipe) -> Void) async {
+        guard let current = strip else { return }
+        var recipe = current.recipe
+        mutate(&recipe)
+        guard recipe != current.recipe else { return }
+
+        renderGeneration &+= 1
+        let generation = renderGeneration
+        do {
+            let image = try await render(recipe, scale: Self.previewScale)
+            // A newer edit has already started; its render is the one to show.
+            guard generation == renderGeneration else { return }
+            try store.update(recipe)
+            strip = RenderedStrip(recipe: recipe, image: image)
+        } catch {
+            // The previously shown strip stays up. Blanking the viewport on a
+            // failed edit would lose work that is still on disk.
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func buildStrip() async {
