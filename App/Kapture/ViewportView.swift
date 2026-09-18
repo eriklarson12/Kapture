@@ -28,7 +28,12 @@ struct ViewportView: View {
 
     @ViewBuilder
     private var content: some View {
-        if let strip = model.strip {
+        // The retake branch comes first on purpose. A strip exists during a
+        // retake, and if it won the subject would be posing at a photograph of
+        // themselves instead of at the camera.
+        if model.retakingFrame != nil {
+            feed
+        } else if let strip = model.strip {
             StripPreviewView(image: strip.image)
         } else if let reviewing {
             // Mirrored to match the preview. The subject just saw themselves
@@ -124,27 +129,54 @@ struct ViewportView: View {
         }
     }
 
+    @ViewBuilder
     private var controls: some View {
-        HStack(spacing: 12) {
-            if model.strip != nil {
-                Button("Retake") { model.retake() }
-                    .frame(minWidth: 110, minHeight: 44)
-                    .keyboardShortcut(.escape, modifiers: [])
+        // Nothing to press mid-retake: the camera is busy and the strip on disk
+        // is about to change under any button here.
+        if model.retakingFrame == nil {
+            HStack(spacing: 12) {
+                if let strip = model.strip {
+                    Button("Retake") { model.retake() }
+                        .frame(minWidth: 110, minHeight: 44)
+                        .keyboardShortcut(.escape, modifiers: [])
 
-                Button(model.isExporting ? "Saving" : "Save PNG") {
-                    Task { await model.exportStrip() }
+                    redo(shots: strip.recipe.frameIDs.count)
+
+                    Button(model.isExporting ? "Saving" : "Save PNG") {
+                        Task { await model.exportStrip() }
+                    }
+                    .frame(minWidth: 110, minHeight: 44)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(model.isExporting)
+                } else {
+                    Button(shutterLabel) { Task { await model.capture() } }
+                        .frame(minWidth: 160, minHeight: 44)
+                        .keyboardShortcut(.space, modifiers: [])
+                        .disabled(!model.canCapture)
                 }
-                .frame(minWidth: 110, minHeight: 44)
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(model.isExporting)
-            } else {
-                Button(shutterLabel) { Task { await model.capture() } }
-                    .frame(minWidth: 160, minHeight: 44)
-                    .keyboardShortcut(.space, modifiers: [])
-                    .disabled(!model.canCapture)
+            }
+            .padding(.bottom, 24)
+        }
+    }
+
+    /// Re-shoot one photo without redoing the run. Numbered rather than named,
+    /// because the numbers are the same ones the progress counter shows during
+    /// a run, so the label is already learned by the time it is needed.
+    private func redo(shots: Int) -> some View {
+        HStack(spacing: 6) {
+            Text("Redo")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.65))
+            ForEach(0..<shots, id: \.self) { index in
+                Button("\(index + 1)") {
+                    Task { await model.retakeFrame(index) }
+                }
+                .frame(minWidth: 32, minHeight: 28)
+                .accessibilityLabel("Redo shot \(index + 1)")
             }
         }
-        .padding(.bottom, 24)
+        .monospacedDigit()
+        .disabled(!model.canCapture)
     }
 
     private var shutterLabel: String {

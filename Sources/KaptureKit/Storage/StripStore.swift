@@ -4,6 +4,8 @@ import Foundation
 public enum StripStoreError: Error, Equatable {
     case notFound(UUID)
     case missingFrame(UUID)
+    case frameIndexOutOfRange(Int)
+    case missingAsset(UUID)
 }
 
 /// Strips on disk. One strip is one package directory holding its recipe and
@@ -14,7 +16,12 @@ public enum StripStoreError: Error, Equatable {
 /// <root>/Strips/<recipe-uuid>.kapturestrip/
 ///     recipe.json
 ///     frames/<frame-uuid>.png
+///     assets/<asset-uuid>.png
 /// ```
+///
+/// `assets/` holds pictures the strip refers to but did not shoot, currently a
+/// background image (ADR-012). Same lifetime as the strip, deleted with it,
+/// never shared — the reasoning ADR-011 applied to frames, one directory over.
 ///
 /// `root` is injected: the app passes Application Support, tests pass a
 /// temporary directory.
@@ -48,7 +55,7 @@ public struct StripStore: Sendable {
         filter: PhotoFilter = .none,
         caption: String? = nil,
         style: StripStyle? = nil,
-        mirrorOutput: Bool = false
+        mirrorOutput: Bool = true
     ) throws -> StripRecipe {
         let ordered = frames.sorted { $0.index < $1.index }
         let recipe = StripRecipe(
@@ -108,6 +115,70 @@ public struct StripStore: Sendable {
             .write(to: package.appending(path: "recipe.json"), options: .atomic)
     }
 
+    /// Swaps one frame inside an existing package and returns the recipe that
+    /// names it. The old frame is removed: frames are private to their strip
+    /// (ADR-011), so nothing else can be pointing at it.
+    ///
+    /// The order is the whole of the correctness here. The new frame is
+    /// written, then the recipe that points at it, then the old frame is
+    /// removed. A crash after the recipe write leaves an orphan file, which is
+    /// invisible and costs a couple of megabytes; a crash after an early delete
+    /// would leave a strip that cannot render at all.
+    public func replaceFrame(
+        _ image: CGImage, at index: Int, in recipe: StripRecipe
+    ) throws -> StripRecipe {
+        guard recipe.frameIDs.indices.contains(index) else {
+            throw StripStoreError.frameIndexOutOfRange(index)
+        }
+        let package = packageURL(for: recipe.id)
+        guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false)) else {
+            throw StripStoreError.notFound(recipe.id)
+        }
+
+        let replaced = recipe.frameIDs[index]
+        let arrival = UUID()
+        try ImageCodec.encodePNG(image).write(
+            to: frameURL(recipeID: recipe.id, frameID: arrival), options: .atomic
+        )
+
+        var updated = recipe
+        updated.frameIDs[index] = arrival
+        try update(updated)
+
+        // The strip is already correct by this point, so a failure to tidy up
+        // must not throw away a retake the user just sat through.
+        try? FileManager.default.removeItem(
+            at: frameURL(recipeID: recipe.id, frameID: replaced)
+        )
+        return updated
+    }
+
+    /// Copies an image into a strip's own package and returns the id that
+    /// names it. The directory is created on first use, so a strip that never
+    /// wanted one does not carry an empty folder.
+    public func saveAsset(_ image: CGImage, in id: UUID) throws -> UUID {
+        let package = packageURL(for: id)
+        guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false)) else {
+            throw StripStoreError.notFound(id)
+        }
+        try FileManager.default.createDirectory(
+            at: package.appending(path: "assets", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        let assetID = UUID()
+        try ImageCodec.encodePNG(image).write(
+            to: assetURL(recipeID: id, assetID: assetID), options: .atomic
+        )
+        return assetID
+    }
+
+    public func loadAsset(_ assetID: UUID, in id: UUID) throws -> CGImage {
+        guard let data = try? Data(contentsOf: assetURL(recipeID: id, assetID: assetID)) else {
+            throw StripStoreError.missingAsset(assetID)
+        }
+        return try ImageCodec.decodePNG(data)
+    }
+
     public func load(id: UUID) throws -> StripRecipe {
         let url = packageURL(for: id).appending(path: "recipe.json")
         guard let data = try? Data(contentsOf: url) else {
@@ -144,7 +215,14 @@ public struct StripStore: Sendable {
                 }
                 return try? RecipeCoding.decoder().decode(StripRecipe.self, from: data)
             }
-            .sorted { $0.createdAt > $1.createdAt }
+            // Ties break on id so the order is total. Two strips cannot really
+            // share a millisecond — a run takes seconds — but an arbitrary
+            // order for equal keys is a flake waiting for a fast machine.
+            .sorted {
+                $0.createdAt == $1.createdAt
+                    ? $0.id.uuidString < $1.id.uuidString
+                    : $0.createdAt > $1.createdAt
+            }
     }
 
     public func delete(id: UUID) throws {
@@ -157,5 +235,9 @@ public struct StripStore: Sendable {
 
     func frameURL(recipeID: UUID, frameID: UUID) -> URL {
         packageURL(for: recipeID).appending(path: "frames/\(frameID.uuidString).png")
+    }
+
+    func assetURL(recipeID: UUID, assetID: UUID) -> URL {
+        packageURL(for: recipeID).appending(path: "assets/\(assetID.uuidString).png")
     }
 }

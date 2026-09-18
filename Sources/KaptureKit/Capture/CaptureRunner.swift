@@ -50,24 +50,8 @@ public final class CaptureRunner {
         defer { isRunning = false }
 
         for index in 0..<sequence.frameCount {
-            for remaining in stride(from: sequence.countdownSeconds, through: 1, by: -1) {
-                state = .countingDown(frame: index, secondsRemaining: remaining)
-                await clock.wait(.seconds(1))
-                if shouldStop { state = .idle; return }
-            }
-
-            // The flash is fill light, so it goes up *before* the shutter and
-            // stays up through it. docs/design-system.md.
-            state = .flashing(frame: index)
-            await clock.wait(.seconds(CaptureSequence.flashSeconds))
-
-            do {
-                let image = try await camera.captureStill()
-                frames.append(CaptureFrame(index: index, image: image))
-            } catch {
-                state = .failed(error.localizedDescription)
-                return
-            }
+            guard let frame = await shoot(index: index) else { return }
+            frames.append(frame)
             if shouldStop { state = .idle; return }
 
             // No review beat after the last shot; the strip is what comes next.
@@ -80,6 +64,47 @@ public final class CaptureRunner {
         }
 
         state = .finished
+    }
+
+    /// Re-shoots one slot of a strip that already exists.
+    ///
+    /// Deliberately does not touch `frames`: that array is the record of a
+    /// whole run, and `isComplete` has to keep meaning "a run finished" rather
+    /// than "the last thing that happened produced an image". There is no
+    /// review beat either — the re-rendered strip is the review.
+    public func captureOne(frame index: Int) async -> CaptureFrame? {
+        guard !isRunning else { return nil }
+        isRunning = true
+        stopRequested = false
+        defer { isRunning = false }
+
+        let frame = await shoot(index: index)
+        if frame != nil { state = .finished }
+        return frame
+    }
+
+    /// One shot: countdown, flash, shutter. Returns nil when the run was
+    /// stopped or the camera failed, having already set the state that says
+    /// which. Shared by `run()` and `captureOne(frame:)` so a retake cannot
+    /// drift away from a run in how it counts down or when it fires.
+    private func shoot(index: Int) async -> CaptureFrame? {
+        for remaining in stride(from: sequence.countdownSeconds, through: 1, by: -1) {
+            state = .countingDown(frame: index, secondsRemaining: remaining)
+            await clock.wait(.seconds(1))
+            if shouldStop { state = .idle; return nil }
+        }
+
+        // The flash is fill light, so it goes up *before* the shutter and
+        // stays up through it. docs/design-system.md.
+        state = .flashing(frame: index)
+        await clock.wait(.seconds(CaptureSequence.flashSeconds))
+
+        do {
+            return CaptureFrame(index: index, image: try await camera.captureStill())
+        } catch {
+            state = .failed(error.localizedDescription)
+            return nil
+        }
     }
 
     /// Stops at the next beat. Frames already captured are kept, so a cancelled

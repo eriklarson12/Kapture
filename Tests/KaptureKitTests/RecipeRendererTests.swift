@@ -52,7 +52,11 @@ struct RecipeRendererTests {
         try withStore { store in
             let template = BuiltInTemplates.classicStrip
             let frames = asymmetricFrames(4)
-            let plain = try store.save(frames: frames, templateID: template.id)
+            // Both spelled out. The flag is what this test is about, so it must
+            // not read the default, which is where the default's own test lives.
+            let plain = try store.save(
+                frames: frames, templateID: template.id, mirrorOutput: false
+            )
             let mirrored = try store.save(
                 frames: frames, templateID: template.id, mirrorOutput: true
             )
@@ -69,6 +73,37 @@ struct RecipeRendererTests {
             #expect(sample(mirroredStrip, x: left) > 223)
             #expect(sample(mirroredStrip, x: right) < 32)
         }
+    }
+
+    @Test("a recorded filter reaches the rendered strip")
+    func appliesStoredFilter() throws {
+        try withStore { store in
+            // Neutral frames, so any colour in the output came from the filter
+            // and not from the photograph.
+            let frames = (0..<4).map {
+                CaptureFrame(index: $0, image: TestImage.solid(width: 64, height: 64, gray: 0.5))
+            }
+            var recipe = try store.save(
+                frames: frames, templateID: BuiltInTemplates.classicStrip.id
+            )
+            let renderer = RecipeRenderer(store: store)
+
+            let plain = try renderer.render(recipe)
+            recipe.filter = .sepia
+            try store.update(recipe)
+            let toned = try renderer.render(try store.load(id: recipe.id))
+
+            // Inside the first photo band, which `photoRects()` puts at the top.
+            let point = CGPoint(x: 72, y: 60)
+            #expect(channels(plain, point).red == channels(plain, point).blue)
+            #expect(channels(toned, point).red > channels(toned, point).blue)
+        }
+    }
+
+    private func channels(_ strip: CGImage, _ point: CGPoint) -> (red: Int, blue: Int) {
+        let pixels = TestImage.pixels(strip)
+        let offset = Int(point.y) * strip.width * 4 + Int(point.x) * 4
+        return (Int(pixels[offset]), Int(pixels[offset + 2]))
     }
 
     @Test("an unknown template id names itself")
@@ -104,7 +139,7 @@ struct RecipeRendererTests {
             // The very corner is border, never photo, so it is the paper.
             #expect(TestImage.red(plain, x: 0, y: 0) == 255)
 
-            recipe.style = StripStyle(background: RGBA(red: 0, green: 0, blue: 0))
+            recipe.style = StripStyle(background: .solid(RGBA(red: 0, green: 0, blue: 0)))
             try store.update(recipe)
             let dark = try RecipeRenderer(store: store).render(try store.load(id: recipe.id))
             #expect(TestImage.red(dark, x: 0, y: 0) == 0)
@@ -114,8 +149,13 @@ struct RecipeRendererTests {
     @Test("a border override moves where the photos start")
     func styleOverridesInset() throws {
         try withStore { store in
+            // Unmirrored on purpose: the border is located by finding the test
+            // image's black left edge, so which way round the photo sits is
+            // part of the measurement and must not come from a default.
             var recipe = try store.save(
-                frames: asymmetricFrames(4), templateID: BuiltInTemplates.classicStrip.id
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
             )
             recipe.style = StripStyle(outerInset: 24)
             try store.update(recipe)

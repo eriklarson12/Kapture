@@ -105,6 +105,17 @@ final class AVFoundationCamera: NSObject, CameraSource {
             throw CaptureError.captureFailed("The photo output could not be attached to the session.")
         }
         session.addOutput(photoOutput)
+
+        // Left to itself AVFoundation mirrors a front-facing camera, so the
+        // handedness of a stored frame would be inherited rather than chosen
+        // and nothing in the project could say which way round it is. Pinned
+        // here, a stored frame is always true optics and `recipe.mirrorOutput`
+        // is the only thing that ever flips a photo.
+        if let connection = photoOutput.connection(with: .video),
+           connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = false
+        }
     }
 }
 

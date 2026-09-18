@@ -17,7 +17,7 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
     /// Reserved strip along the bottom for a caption or date.
     public var footerHeight: CGFloat
     public var cornerRadius: CGFloat
-    public var background: RGBA
+    public var background: StripBackground
     public var foreground: RGBA
     /// Caption size in points. 9pt in a 30pt band prints legibly at 300 dpi.
     public var captionFontSize: CGFloat
@@ -32,7 +32,7 @@ public struct StripTemplate: Codable, Equatable, Identifiable, Sendable {
         gutter: CGFloat,
         footerHeight: CGFloat,
         cornerRadius: CGFloat = 0,
-        background: RGBA = .paper,
+        background: StripBackground = .solid(.paper),
         foreground: RGBA = .ink,
         captionFontSize: CGFloat = 9,
         captionAlignment: CaptionAlignment = .center

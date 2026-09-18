@@ -18,8 +18,10 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
     /// Template fields this strip overrides. Optional, so a recipe written
     /// before styling existed still decodes.
     public var style: StripStyle?
-    /// Whether the output is mirrored. Independent of the preview, which is
-    /// always mirrored because that is what people expect to see of themselves.
+    /// Whether the output is mirrored. On by default, because the live preview
+    /// and the review beat both show the subject mirrored and a strip that came
+    /// out the other way round would contradict what they just watched. The
+    /// stored frame is always true optics; this is the only thing that flips it.
     public var mirrorOutput: Bool
 
     public init(
@@ -30,7 +32,7 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         filter: PhotoFilter = .none,
         caption: String? = nil,
         style: StripStyle? = nil,
-        mirrorOutput: Bool = false
+        mirrorOutput: Bool = true
     ) {
         self.id = id
         self.createdAt = Self.storable(createdAt)

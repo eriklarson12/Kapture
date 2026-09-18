@@ -29,6 +29,9 @@ final class BoothModel {
     private(set) var cameraStatus: CameraStatus = .starting
     private(set) var strip: RenderedStrip?
     private(set) var isBuilding = false
+    /// Which shot is being re-taken, so the viewport shows the camera rather
+    /// than the strip the user is standing in front of.
+    private(set) var retakingFrame: Int?
     var isExporting = false
     var errorMessage: String?
 
@@ -79,6 +82,7 @@ final class BoothModel {
 
     var canCapture: Bool {
         cameraStatus == .live && !isRunning && !isBuilding && !isExporting
+            && retakingFrame == nil
     }
 
     init(root: URL = .kaptureSupportDirectory) {
@@ -119,6 +123,7 @@ final class BoothModel {
 
     func retake() {
         strip = nil
+        retakingFrame = nil
         runner.reset()
     }
 
@@ -131,21 +136,68 @@ final class BoothModel {
     }
 
     /// The one path from an edited recipe to a visible, saved strip. Items 2.1,
-    /// 2.2 and 2.3 all route through here, so there is a single place that knows
-    /// how to re-render and persist.
+    /// 2.2, 2.3, 2.4 and 2.6 all route through here, so there is a single place
+    /// that knows how to re-render and persist.
     func restyle(_ mutate: (inout StripRecipe) -> Void) async {
         guard let current = strip else { return }
         var recipe = current.recipe
         mutate(&recipe)
         guard recipe != current.recipe else { return }
+        await present(recipe, persisting: true)
+    }
 
+    /// Re-shoots one photo of the shown strip, leaving the other three alone.
+    ///
+    /// The package is rewritten by `replaceFrame` rather than by `present`,
+    /// because the new frame has to reach disk before a recipe can name it.
+    func retakeFrame(_ index: Int) async {
+        guard let current = strip, retakingFrame == nil else { return }
+        errorMessage = nil
+        retakingFrame = index
+        defer { retakingFrame = nil }
+
+        guard let frame = await runner.captureOne(frame: index) else {
+            if case .failed(let message) = runner.state { errorMessage = message }
+            return
+        }
+        do {
+            let recipe = try store.replaceFrame(frame.image, at: index, in: current.recipe)
+            await present(recipe, persisting: false)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Copies a picture into the strip's own package and points the background
+    /// at it (ADR-012). Copied rather than referenced, so moving or deleting
+    /// the original cannot break a strip that already exists.
+    func setBackgroundImage(_ image: CGImage) async {
+        guard let current = strip else { return }
+        do {
+            let fitted = StripRenderer.downscaled(
+                image, covering: shownTemplate.pixelSize(atDPI: 300)
+            )
+            let assetID = try store.saveAsset(fitted, in: current.recipe.id)
+            await restyle { recipe in
+                var style = recipe.style ?? StripStyle()
+                style.background = .image(id: assetID)
+                recipe.style = style
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Renders, optionally persists, and shows. The generation guard lives here
+    /// so no edit path can skip it.
+    private func present(_ recipe: StripRecipe, persisting: Bool) async {
         renderGeneration &+= 1
         let generation = renderGeneration
         do {
             let image = try await render(recipe, scale: Self.previewScale)
             // A newer edit has already started; its render is the one to show.
             guard generation == renderGeneration else { return }
-            try store.update(recipe)
+            if persisting { try store.update(recipe) }
             strip = RenderedStrip(recipe: recipe, image: image)
         } catch {
             // The previously shown strip stays up. Blanking the viewport on a

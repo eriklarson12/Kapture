@@ -23,9 +23,9 @@ That one decision buys a lot:
 
 ```
 KaptureKit/          engine: models, layout math, renderer, storage
-  Model/             StripTemplate, StripRecipe, StripStyle, CaptureFrame, RGBA
+  Model/             StripTemplate, StripRecipe, StripStyle, StripBackground, CaptureFrame, RGBA
   Capture/           CameraSource protocol, CaptureSequence, CaptureRunner
-  Compositing/       StripRenderer, RecipeRenderer, CaptionRenderer, PhotoFilter
+  Compositing/       StripRenderer, RecipeRenderer, CaptionRenderer, FilterRenderer
   Storage/           StripStore, ImageCodec
   Templates/         built-in layouts
 
@@ -36,11 +36,11 @@ App/                 SwiftUI shell
 
 The engine contains no UI framework. It has no idea a camera or a window exists, which is what makes every layout decision testable without hardware. The capture driver lives there too, waiting through an injected clock, so a four shot sequence can be tested in milliseconds rather than sat through.
 
-A strip on disk is a single package directory holding its recipe and its frames. Deleting a strip is one filesystem operation, and no frame is ever shared between two strips.
+A strip on disk is a single package directory holding its recipe, its frames, and any picture it uses as a background. Deleting a strip is one filesystem operation, and nothing inside one is ever shared with another.
 
 Styling a strip writes optional overrides onto its recipe rather than editing the template it uses. A value the user never touched keeps following the template, so changing a template still changes every strip that did not override it.
 
-The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps.
+The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
 Geometry is expressed in points, where one point is 1/72 inch, and resolution enters only at render time. The same template drives both the on-screen preview and a 300 dpi print export. The classic 2x6 inch strip renders to exactly 600x1800 pixels.
 
@@ -78,13 +78,14 @@ Working:
 - Three built-in templates
 - Strips stored on disk as re-renderable recipes
 - Paper, ink, border and corner styling, applied per strip and re-rendered live
+- Gradient and picture backgrounds, with the picture kept inside the strip
+- Filters applied at render time, never baked into the photograph
+- Retaking a single shot without redoing the run
 - Captions set in type at output resolution, not scaled from the preview
 - PNG export at 300 dpi, a true 2x6 inches
 
 Planned:
 
-- Filters applied at render time
-- Retaking a single frame without redoing the run
 - Animated GIF and MP4 export
 - A gallery of past strips, re-editable
 - User-authored templates as shareable files

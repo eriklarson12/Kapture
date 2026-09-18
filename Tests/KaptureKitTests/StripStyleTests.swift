@@ -22,10 +22,10 @@ struct StripStyleTests {
     @Test("only the fields a style sets are overridden")
     func partialOverride() {
         let template = BuiltInTemplates.classicStrip
-        let style = StripStyle(background: RGBA(red: 0, green: 0, blue: 0), outerInset: 20)
+        let style = StripStyle(background: .solid(RGBA(red: 0, green: 0, blue: 0)), outerInset: 20)
         let resolved = template.applying(style)
 
-        #expect(resolved.background == RGBA(red: 0, green: 0, blue: 0))
+        #expect(resolved.background == .solid(RGBA(red: 0, green: 0, blue: 0)))
         #expect(resolved.outerInset == 20)
         // Everything else still follows the template, which is what keeps a
         // template edit able to move past strips (roadmap 4.4).

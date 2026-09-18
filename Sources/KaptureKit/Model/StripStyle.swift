@@ -26,7 +26,7 @@ public enum CaptionAlignment: String, Codable, CaseIterable, Sendable {
 /// when its template moves, which is the whole of roadmap 4.4. Storing resolved
 /// values here instead would freeze every strip at the moment it was shot.
 public struct StripStyle: Codable, Equatable, Sendable {
-    public var background: RGBA?
+    public var background: StripBackground?
     public var foreground: RGBA?
     public var outerInset: CGFloat?
     public var cornerRadius: CGFloat?
@@ -34,7 +34,7 @@ public struct StripStyle: Codable, Equatable, Sendable {
     public var captionAlignment: CaptionAlignment?
 
     public init(
-        background: RGBA? = nil,
+        background: StripBackground? = nil,
         foreground: RGBA? = nil,
         outerInset: CGFloat? = nil,
         cornerRadius: CGFloat? = nil,

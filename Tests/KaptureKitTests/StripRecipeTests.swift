@@ -72,6 +72,34 @@ struct StripRecipeTests {
         }
     }
 
+    @Test("a new strip is mirrored, so it matches what the subject saw")
+    func mirrorDefaultsOn() {
+        let recipe = StripRecipe(
+            templateID: BuiltInTemplates.classicStrip.id, frameIDs: [UUID()]
+        )
+        #expect(recipe.mirrorOutput)
+    }
+
+    /// Changing a default must never reach back into what is already written.
+    /// This fixture is the shape every strip shot before 2.6 has on disk.
+    @Test("a strip stored before the default changed keeps its own value")
+    func storedMirrorValueWins() throws {
+        let json = """
+        {
+          "createdAt": "2026-09-18T04:54:10.679Z",
+          "filter": "none",
+          "frameIDs": ["E7234365-5438-427B-BC02-EB895C11C711"],
+          "id": "BD7ABB7D-0750-43EC-BFC6-4A4862D5C576",
+          "mirrorOutput": false,
+          "templateID": "classic-strip"
+        }
+        """
+        let recipe = try RecipeCoding.decoder().decode(
+            StripRecipe.self, from: Data(json.utf8)
+        )
+        #expect(recipe.mirrorOutput == false)
+    }
+
     @Test("resolves a built-in template by id")
     func lookup() {
         #expect(BuiltInTemplates.template(id: "classic-strip") == BuiltInTemplates.classicStrip)

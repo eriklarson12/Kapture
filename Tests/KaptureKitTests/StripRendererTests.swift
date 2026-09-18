@@ -79,4 +79,28 @@ struct StripRendererTests {
             #expect(rect.contains(bounds.insetBy(dx: 0.001, dy: 0.001)))
         }
     }
+
+    // MARK: - Background assets
+
+    @Test("a picture larger than the print is shrunk to cover it")
+    func downscaleShrinksToCover() {
+        let source = TestImage.solid(width: 4000, height: 3000)
+        let target = CGSize(width: 600, height: 1800)
+        let fitted = StripRenderer.downscaled(source, covering: target)
+
+        // Covers on both axes, which is what aspect-fill needs, and is no
+        // larger than it has to be on the binding one.
+        #expect(CGFloat(fitted.width) >= target.width)
+        #expect(CGFloat(fitted.height) >= target.height)
+        #expect(fitted.height == Int(target.height))
+        #expect(fitted.width < source.width)
+    }
+
+    @Test("a picture smaller than the print is left alone")
+    func downscaleNeverEnlarges() {
+        let source = TestImage.solid(width: 100, height: 100)
+        let fitted = StripRenderer.downscaled(source, covering: CGSize(width: 600, height: 1800))
+        #expect(fitted.width == 100)
+        #expect(fitted.height == 100)
+    }
 }

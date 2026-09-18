@@ -120,4 +120,55 @@ struct CaptureRunnerTests {
         #expect(runner.state == .idle)
         #expect(runner.frames.isEmpty)
     }
+
+    // MARK: - Single-frame retake
+
+    @Test("a retake shoots one slot and keeps its index")
+    func retakeShootsOneSlot() async throws {
+        let (runner, camera, _) = try await makeRunner()
+        await runner.run()
+        #expect(camera.captureCount == 4)
+
+        let frame = await runner.captureOne(frame: 2)
+        #expect(frame?.index == 2)
+        #expect(camera.captureCount == 5)
+        #expect(runner.state == .finished)
+    }
+
+    /// `frames` is the record of a whole run and `isComplete` reads it. A
+    /// retake that appended would make a four-shot strip look like a five-shot
+    /// one, which the renderer would refuse.
+    @Test("a retake leaves the run's own frames alone")
+    func retakeDoesNotTouchRunFrames() async throws {
+        let (runner, _, _) = try await makeRunner()
+        await runner.run()
+        let before = runner.frames.map(\.id)
+
+        _ = await runner.captureOne(frame: 0)
+        #expect(runner.frames.map(\.id) == before)
+        #expect(runner.isComplete)
+    }
+
+    @Test("a retake counts down and flashes exactly like a run does")
+    func retakeUsesTheSameBeats() async throws {
+        let sequence = CaptureSequence(frameCount: 4, countdownSeconds: 2, reviewSeconds: 1.5)
+        let (runner, _, clock) = try await makeRunner(sequence: sequence)
+
+        _ = await runner.captureOne(frame: 1)
+        // Countdown then flash, and no review beat: the re-rendered strip is
+        // the review.
+        #expect(clock.waits == [
+            .seconds(1), .seconds(1), .seconds(CaptureSequence.flashSeconds),
+        ])
+    }
+
+    @Test("a failed retake reports itself and returns nothing")
+    func retakeFailureSurfaces() async throws {
+        let (runner, camera, _) = try await makeRunner()
+        camera.failNextCapture = .captureFailed("lens cap")
+
+        let frame = await runner.captureOne(frame: 0)
+        #expect(frame == nil)
+        #expect(runner.state == .failed(CaptureError.captureFailed("lens cap").localizedDescription))
+    }
 }

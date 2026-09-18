@@ -27,8 +27,27 @@ struct InspectorView: View {
                 LabeledContent("Print size", value: printSize)
             }
 
+            Section("Photos") {
+                Picker("Filter", selection: filter) {
+                    ForEach(PhotoFilter.allCases, id: \.self) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                Toggle("Mirror output", isOn: mirrorOutput)
+                Text("The preview and the review beat are always mirrored. This is whether the strip is too.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(model.strip == nil)
+
             Section("Appearance") {
-                ColorPicker("Paper", selection: paper, supportsOpacity: false)
+                BackgroundControls(
+                    background: model.shownTemplate.background,
+                    onChange: { value in setStyle { $0.background = value } },
+                    onChooseImage: { image in
+                        Task { await model.setBackgroundImage(image) }
+                    }
+                )
                 ColorPicker("Ink", selection: ink, supportsOpacity: false)
                 Stepper(
                     "Border: \(Int(model.shownTemplate.outerInset))pt",
@@ -80,7 +99,6 @@ struct InspectorView: View {
         .formStyle(.grouped)
         .monospacedDigit()
         .disabled(model.isRunning)
-        // TODO 2.4: filter picker.
     }
 
     // MARK: - Bindings
@@ -98,17 +116,24 @@ struct InspectorView: View {
         }
     }
 
+    private var filter: Binding<PhotoFilter> {
+        Binding(
+            get: { model.strip?.recipe.filter ?? .none },
+            set: { value in Task { await model.restyle { $0.filter = value } } }
+        )
+    }
+
+    private var mirrorOutput: Binding<Bool> {
+        Binding(
+            get: { model.strip?.recipe.mirrorOutput ?? true },
+            set: { value in Task { await model.restyle { $0.mirrorOutput = value } } }
+        )
+    }
+
     private var templateSelection: Binding<String> {
         Binding(
             get: { model.templateID },
             set: { id in Task { await model.selectTemplate(id) } }
-        )
-    }
-
-    private var paper: Binding<Color> {
-        Binding(
-            get: { model.shownTemplate.background.color },
-            set: { value in setStyle { $0.background = RGBA(value) } }
         )
     }
 
