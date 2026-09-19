@@ -15,11 +15,6 @@ public struct StripRenderer {
 
     /// Renders `frames` into `template`. Scale 1 gives point-for-pixel preview
     /// geometry; use `template.scale(forDPI:)` for a print export.
-    ///
-    /// `mirrored` flips each photo about its own centre rather than flipping
-    /// the canvas, so the border and the footer stay the right way round. The
-    /// caption is the first thing that depends on that: it is drawn once, after
-    /// the photos, and is never affected by the flip.
     public func render(
         frames: [CGImage],
         template: StripTemplate,
@@ -28,10 +23,7 @@ public struct StripRenderer {
         mirrored: Bool = false,
         caption: String? = nil
     ) throws -> CGImage {
-        guard template.isValid else { throw StripRenderError.invalidTemplate }
-        guard frames.count == template.frameCount else {
-            throw StripRenderError.frameCountMismatch(expected: template.frameCount, actual: frames.count)
-        }
+        try validate(frames: frames, template: template)
         guard scale > 0, let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
             throw StripRenderError.contextCreationFailed
         }
@@ -52,8 +44,49 @@ public struct StripRenderer {
             throw StripRenderError.contextCreationFailed
         }
 
-        context.interpolationQuality = .high
         context.scaleBy(x: scale, y: scale)
+        try draw(
+            frames: frames,
+            template: template,
+            backgroundImage: backgroundImage,
+            mirrored: mirrored,
+            caption: caption,
+            into: context
+        )
+
+        guard let output = context.makeImage() else { throw StripRenderError.contextCreationFailed }
+        return output
+    }
+
+    /// Draws a strip into a context the caller owns, in points, bottom-left
+    /// origin, at the transform already on it.
+    ///
+    /// Owning the context is the point: the same drawing lands in a bitmap for
+    /// a PNG, in a page for a PDF, and twice on a sheet for a print. Nothing
+    /// here creates a context and nothing here does I/O.
+    ///
+    /// `mirrored` flips each photo about its own centre rather than flipping
+    /// the canvas, so the border and the footer stay the right way round. The
+    /// caption is the first thing that depends on that: it is drawn once, after
+    /// the photos, and is never affected by the flip.
+    ///
+    /// The whole body is bracketed by a save and a restore. A sheet draws this
+    /// more than once, and a transform or a fill colour left behind would move
+    /// the second copy with nothing on screen to say why.
+    public func draw(
+        frames: [CGImage],
+        template: StripTemplate,
+        backgroundImage: CGImage? = nil,
+        mirrored: Bool = false,
+        caption: String? = nil,
+        into context: CGContext
+    ) throws {
+        try validate(frames: frames, template: template)
+
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        context.interpolationQuality = .high
         try fill(
             template.background,
             in: CGRect(origin: .zero, size: template.canvasSize),
@@ -93,9 +126,17 @@ public struct StripRenderer {
                 context: context
             )
         }
+    }
 
-        guard let output = context.makeImage() else { throw StripRenderError.contextCreationFailed }
-        return output
+    /// The two checks every drawing path shares, in one order, so a PDF caller
+    /// and a bitmap caller fail the same way on the same input.
+    private func validate(frames: [CGImage], template: StripTemplate) throws {
+        guard template.isValid else { throw StripRenderError.invalidTemplate }
+        guard frames.count == template.frameCount else {
+            throw StripRenderError.frameCountMismatch(
+                expected: template.frameCount, actual: frames.count
+            )
+        }
     }
 
     /// Paints the canvas behind the photos. An image arrives already loaded,

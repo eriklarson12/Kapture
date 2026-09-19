@@ -150,4 +150,33 @@ struct StripRendererTests {
             try StripRenderer.photo(TestImage.asymmetric(), size: CGSize(width: 0, height: 100))
         }
     }
+
+    /// The property a print sheet stands on: `draw` honours the transform the
+    /// caller has already set, and leaves none of its own behind. A save that
+    /// went missing would put the second copy somewhere else, or nowhere.
+    @Test("the same strip draws twice into one context")
+    func drawsTwiceIntoOneContext() throws {
+        let template = BuiltInTemplates.classicStrip
+        let frames = (0..<4).map { _ in TestImage.asymmetric() }
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(
+            CGContext(
+                data: nil, width: 288, height: 432, bitsPerComponent: 8,
+                bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
+
+        // No save or restore here on purpose: the second copy lands correctly
+        // only if the first draw left the context as it found it.
+        try renderer.draw(frames: frames, template: template, into: context)
+        context.translateBy(x: 144, y: 0)
+        try renderer.draw(frames: frames, template: template, into: context)
+
+        let sheet = try #require(context.makeImage())
+        #expect(TestImage.red(sheet, x: 50, y: 150) == 0)
+        #expect(TestImage.red(sheet, x: 100, y: 150) == 255)
+        #expect(TestImage.red(sheet, x: 194, y: 150) == 0)
+        #expect(TestImage.red(sheet, x: 244, y: 150) == 255)
+    }
 }

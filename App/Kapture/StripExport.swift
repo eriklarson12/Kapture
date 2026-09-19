@@ -3,8 +3,8 @@ import KaptureKit
 import UniformTypeIdentifiers
 
 /// Export policy: what each file is called, how big it is, and how fast it
-/// plays. Three formats now share one timestamp, so a strip's PNG, GIF and
-/// movie sort together in a folder.
+/// plays. Every format shares one timestamp, so a strip's PNG, GIF, movie and
+/// PDF sort together in a folder.
 enum StripExport {
     /// Print resolution. The classic strip at 300 dpi is 600x1800 pixels,
     /// which is a true 2x6 inches.
@@ -19,6 +19,31 @@ enum StripExport {
     /// upscales.
     static let movieHeight: CGFloat = 1080
     static let movieSecondsPerFrame: Double = 0.8
+
+    /// The photographs are embedded in a PDF at the resolution the paper can
+    /// hold. Higher buys nothing a printer can use: a real four-shot strip is
+    /// 12.6 MB with the stored frames embedded and 2.1 MB at 300 dpi.
+    static let pdfPhotoDPI: CGFloat = 300
+
+    /// The print job's settings, inherited from whatever the user has set up
+    /// and then pinned where the strip's size depends on it.
+    ///
+    /// `scalingFactor` is the one value that must stay at 1. Anything else and
+    /// the strip stops being two inches wide, which no part of the app can
+    /// detect and only a ruler on a finished print will show.
+    static func printInfo(pageSize: CGSize) -> NSPrintInfo {
+        let inherited = NSPrintInfo.shared.dictionary() as? [NSPrintInfo.AttributeKey: Any]
+        let info = inherited.map(NSPrintInfo.init(dictionary:)) ?? NSPrintInfo()
+        info.paperSize = pageSize
+        info.topMargin = 0
+        info.bottomMargin = 0
+        info.leftMargin = 0
+        info.rightMargin = 0
+        info.isHorizontallyCentered = true
+        info.isVerticallyCentered = true
+        info.scalingFactor = 1
+        return info
+    }
 
     static func filename(for recipe: StripRecipe, ext: String) -> String {
         let formatter = DateFormatter()
@@ -112,8 +137,101 @@ extension BoothModel {
         }
     }
 
-    /// The save panel the three exports share, so they cannot drift on naming
-    /// or on what a cancel does.
+    /// The strip as a page rather than as pixels. A PNG asks to be printed at
+    /// 2x6 inches through metadata some print paths ignore; a PDF's page box
+    /// measures two inches by six and cannot be read any other way.
+    func exportPDF() async {
+        guard let strip else { return }
+        guard let url = await save(
+            strip.recipe,
+            type: .pdf,
+            ext: "pdf",
+            message: "Export this strip as a PDF that prints at a true 2x6 inches."
+        ) else { return }
+
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let renderer = RecipeRenderer(store: store)
+            let recipe = strip.recipe
+            let data = try await Task.detached(priority: .userInitiated) {
+                try renderer.renderPDF(recipe, photoDPI: StripExport.pdfPhotoDPI)
+            }.value
+            try data.write(to: url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// The strip on the pasteboard, PNG first.
+    ///
+    /// A consumer takes the first declared type it understands. A strip is a
+    /// photograph, so PNG is the flavour that behaves the same in Mail, in
+    /// Messages and in a document; the PDF is there for anything that asks for
+    /// something it can scale.
+    func copyStrip() async {
+        guard let strip else { return }
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let renderer = RecipeRenderer(store: store)
+            let recipe = strip.recipe
+            let scale = try renderer.template(for: recipe).scale(forDPI: StripExport.dpi)
+            let flavours = try await Task.detached(priority: .userInitiated) {
+                (
+                    png: try ImageCodec.encodePNG(
+                        renderer.render(recipe, scale: scale), dpi: StripExport.dpi
+                    ),
+                    pdf: try renderer.renderPDF(recipe, photoDPI: StripExport.pdfPhotoDPI)
+                )
+            }.value
+
+            let pasteboard = NSPasteboard.general
+            pasteboard.declareTypes([.png, .pdf], owner: nil)
+            pasteboard.setData(flavours.png, forType: .png)
+            pasteboard.setData(flavours.pdf, forType: .pdf)
+            confirmCopy()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Two strips on a 4x6 sheet, which is the stock a booth prints on: one
+    /// sheet, one cut, two keepsakes.
+    func printStrip() async {
+        guard let strip else { return }
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let renderer = RecipeRenderer(store: store)
+            let recipe = strip.recipe
+            let layout = SheetLayout()
+            let resolved = try await Task.detached(priority: .userInitiated) {
+                try renderer.resolve(recipe, photoDPI: StripExport.pdfPhotoDPI)
+            }.value
+
+            let operation = NSPrintOperation(
+                view: StripPrintView(strip: resolved, layout: layout),
+                printInfo: StripExport.printInfo(pageSize: layout.pageSize)
+            )
+            operation.showsPrintPanel = true
+            operation.showsProgressPanel = true
+            operation.run()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func confirmCopy() {
+        didCopy = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            didCopy = false
+        }
+    }
+
+    /// The save panel the exports share, so they cannot drift on naming or on
+    /// what a cancel does.
     private func save(
         _ recipe: StripRecipe, type: UTType, ext: String, message: String
     ) async -> URL? {

@@ -279,4 +279,51 @@ struct RecipeRendererTests {
             #expect(plain.width != wider.width)
         }
     }
+
+    @Test("resolving applies the strip's own overrides to the template")
+    func resolveAppliesStyle() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            var recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+            recipe.style = StripStyle(outerInset: 20)
+
+            let resolved = try RecipeRenderer(store: store).resolve(recipe)
+            let expected: CGFloat = 20
+            #expect(resolved.template.outerInset == expected)
+        }
+    }
+
+    /// A stored frame is far more detail than a photo band at 300 dpi can
+    /// hold. Measured on a real strip, embedding the originals costs 12.6 MB
+    /// against 2.1 MB.
+    @Test("resolving for print shrinks each frame to what the paper can hold")
+    func resolveDownscalesForPrint() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+            let renderer = RecipeRenderer(store: store)
+
+            let native = try renderer.resolve(recipe).frames[0]
+            let forPrint = try renderer.resolve(recipe, photoDPI: 300).frames[0]
+
+            #expect(forPrint.width < native.width)
+            // Smaller, but still the size of the band it has to fill. The
+            // pixel of slack is `downscaled` rounding to whole pixels, which
+            // can land a fraction short of the band and is invisible at 300
+            // dpi.
+            let needed = template.photoWidth * template.scale(forDPI: 300)
+            #expect(CGFloat(forPrint.width) >= needed - 1)
+        }
+    }
+
+    @Test("resolving without a dpi leaves the frames at their stored size")
+    func resolveKeepsNativeFrames() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+            let resolved = try RecipeRenderer(store: store).resolve(recipe)
+            #expect(resolved.frames[0].width == 640)
+            #expect(resolved.frames[0].height == 480)
+        }
+    }
 }

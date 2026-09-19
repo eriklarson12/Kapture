@@ -33,6 +33,9 @@ final class BoothModel {
     /// than the strip the user is standing in front of.
     private(set) var retakingFrame: Int?
     var isExporting = false
+    /// A copy leaves no panel and no file, so the menu item says it happened
+    /// for a moment. Nothing else would.
+    var didCopy = false
     var errorMessage: String?
 
     /// Guards against an out-of-order render. Dragging a colour emits a stream

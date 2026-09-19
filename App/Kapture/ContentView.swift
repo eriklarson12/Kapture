@@ -4,7 +4,7 @@ import SwiftUI
 /// Shell layout: viewport on the left, inspector on the right. Chrome stays
 /// achromatic so nothing competes with the photos. See docs/design-system.md.
 struct ContentView: View {
-    @State private var model = BoothModel()
+    let model: BoothModel
 
     var body: some View {
         HSplitView {

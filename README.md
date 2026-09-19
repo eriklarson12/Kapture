@@ -6,7 +6,7 @@ Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Status
 
-The core loop works: press a button, get four photos on a countdown, see the strip, style it, save it as a 300 dpi PNG, a looping GIF or a movie. See Roadmap below.
+The core loop works: press a button, get four photos on a countdown, see the strip, style it, then save it as a 300 dpi PNG, a looping GIF, a movie or a PDF, paste it into another app, or print it. See Roadmap below.
 
 ## How it works
 
@@ -25,13 +25,15 @@ That one decision buys a lot:
 KaptureKit/          engine: models, layout math, renderer, storage
   Model/             StripTemplate, StripRecipe, StripStyle, StripBackground, CaptureFrame, RGBA
   Capture/           CameraSource protocol, CaptureSequence, CaptureRunner
-  Compositing/       StripRenderer, RecipeRenderer, CaptionRenderer, FilterRenderer
+  Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer
+  Export/            MovieRenderer, PDFRenderer, SheetLayout
   Storage/           StripStore, ImageCodec
   Templates/         built-in layouts
 
 App/                 SwiftUI shell
   BoothModel.swift           app state and policy
-  AVFoundationCamera.swift   the only file that touches AVFoundation
+  StripExport.swift          export, clipboard and print policy
+  AVFoundationCamera.swift   the only file that touches a camera
 ```
 
 The engine contains no UI framework. It has no idea a camera or a window exists, which is what makes every layout decision testable without hardware. The capture driver lives there too, waiting through an injected clock, so a four shot sequence can be tested in milliseconds rather than sat through.
@@ -42,7 +44,7 @@ Styling a strip writes optional overrides onto its recipe rather than editing th
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
-Geometry is expressed in points, where one point is 1/72 inch, and resolution enters only at render time. The same template drives both the on-screen preview and a 300 dpi print export. The classic 2x6 inch strip renders to exactly 600x1800 pixels.
+Geometry is expressed in points, where one point is 1/72 inch, and resolution enters only at render time. The same template drives the on-screen preview, a 300 dpi print export, and a PDF page. One drawing routine serves all three: it takes a graphics context rather than making one, so a bitmap, a page and a print job cannot disagree about what a strip looks like. The classic 2x6 inch strip renders to exactly 600x1800 pixels, and to a page of exactly 144x432 points.
 
 ## Requirements
 
@@ -84,6 +86,9 @@ Working:
 - Captions set in type at output resolution, not scaled from the preview
 - PNG export at 300 dpi, a true 2x6 inches
 - Animated GIF and MP4 export of the shots, cropped and filtered exactly as the strip crops them
+- PDF export as a real page: the page box measures a true 2x6 inches and the caption is embedded text, not pixels
+- Copy to the clipboard, as a photograph and as something a document can scale
+- Printing, two strips to a 4x6 sheet, at 100% so each one is a true two inches
 
 Planned:
 

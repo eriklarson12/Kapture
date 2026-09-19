@@ -28,20 +28,53 @@ public struct RecipeRenderer: Sendable {
         return template
     }
 
-    /// Scale 1 is preview geometry; `template.scale(forDPI: 300)` is a print.
-    public func render(_ recipe: StripRecipe, scale: CGFloat = 1) throws -> CGImage {
+    /// Everything the recipe points at, loaded once: the template with the
+    /// strip's overrides applied, the frames filtered, and the background
+    /// picture if it has one.
+    ///
+    /// `photoDPI`, when given, shrinks each frame to the size its photo rect
+    /// needs at that resolution. A stored frame is 1920x1080 and a photo band
+    /// on the classic strip at 300 dpi is about 534x384, so a PDF of a real
+    /// strip is 12.6 MB with the originals embedded and 2.1 MB without. Nil
+    /// leaves the frames alone, which is what an on-screen render wants.
+    public func resolve(_ recipe: StripRecipe, photoDPI: CGFloat? = nil) throws -> ResolvedStrip {
         let template = try template(for: recipe).applying(recipe.style)
-        let frames = try store.loadFrames(for: recipe).map {
+        var frames = try store.loadFrames(for: recipe).map {
             FilterRenderer.apply(recipe.filter, to: $0)
         }
-        return try StripRenderer().render(
-            frames: frames,
+        if let photoDPI {
+            let scale = template.scale(forDPI: photoDPI)
+            let cover = CGSize(
+                width: template.photoWidth * scale,
+                height: template.photoHeight * scale
+            )
+            frames = frames.map { StripRenderer.downscaled($0, covering: cover) }
+        }
+        return ResolvedStrip(
             template: template,
+            frames: frames,
             backgroundImage: try backgroundImage(for: recipe, template: template),
-            scale: scale,
             mirrored: recipe.mirrorOutput,
             caption: recipe.caption
         )
+    }
+
+    /// Scale 1 is preview geometry; `template.scale(forDPI: 300)` is a print.
+    public func render(_ recipe: StripRecipe, scale: CGFloat = 1) throws -> CGImage {
+        try resolve(recipe).render(scale: scale)
+    }
+
+    /// The strip as a single page at its own size in points, so a 2x6 strip is
+    /// a document that measures two inches by six wherever it is opened.
+    public func renderPDF(_ recipe: StripRecipe, photoDPI: CGFloat = 300) throws -> Data {
+        try PDFRenderer.page(resolve(recipe, photoDPI: photoDPI))
+    }
+
+    /// The strip tiled onto a sheet for printing and cutting.
+    public func renderSheetPDF(
+        _ recipe: StripRecipe, layout: SheetLayout = SheetLayout(), photoDPI: CGFloat = 300
+    ) throws -> Data {
+        try PDFRenderer.sheet(resolve(recipe, photoDPI: photoDPI), layout: layout)
     }
 
     /// The recipe's photos as standalone images: filtered, mirrored, and

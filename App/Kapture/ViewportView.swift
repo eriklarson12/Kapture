@@ -142,12 +142,18 @@ struct ViewportView: View {
 
                     redo(shots: strip.recipe.frameIDs.count)
 
-                    // A split button rather than three: PNG keeps the click
-                    // and Cmd-S it has always had, and Tier 3 has three more
-                    // export formats queued behind these two.
-                    Menu(model.isExporting ? "Saving" : "Save") {
+                    // A split button rather than one per format: PNG keeps the
+                    // click and Cmd-S it has always had. The rule separates the
+                    // formats that write a file from the two that do not.
+                    Menu(saveLabel) {
                         Button("Animated GIF\u{2026}") { Task { await model.exportGIF() } }
                         Button("Movie\u{2026}") { Task { await model.exportMovie() } }
+                        Button("PDF\u{2026}") { Task { await model.exportPDF() } }
+                        Divider()
+                        Button(model.didCopy ? "Copied" : "Copy Strip") {
+                            Task { await model.copyStrip() }
+                        }
+                        Button("Print\u{2026}") { Task { await model.printStrip() } }
                     } primaryAction: {
                         Task { await model.exportStrip() }
                     }
@@ -184,6 +190,11 @@ struct ViewportView: View {
         }
         .monospacedDigit()
         .disabled(!model.canCapture)
+    }
+
+    private var saveLabel: String {
+        if model.didCopy { return "Copied" }
+        return model.isExporting ? "Saving" : "Save"
     }
 
     private var shutterLabel: String {
