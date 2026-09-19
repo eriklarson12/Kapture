@@ -185,6 +185,41 @@ public struct StripRenderer {
         return context.makeImage() ?? image
     }
 
+    /// One photo on its own, aspect-filled into `size` and optionally mirrored.
+    ///
+    /// Shared with the animation exports, so a frame in a GIF is cropped
+    /// exactly the way the same frame is cropped on the paper. Two crops that
+    /// agree by coincidence are two crops that will eventually disagree.
+    public static func photo(
+        _ image: CGImage, size: CGSize, mirrored: Bool = false
+    ) throws -> CGImage {
+        let width = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+        guard width > 0, height > 0,
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: nil, width: width, height: height, bitsPerComponent: 8,
+                  bytesPerRow: 0, space: colorSpace,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { throw StripRenderError.contextCreationFailed }
+
+        let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        context.interpolationQuality = .high
+        context.clip(to: bounds)
+        if mirrored {
+            context.translateBy(x: bounds.midX, y: 0)
+            context.scaleBy(x: -1, y: 1)
+            context.translateBy(x: -bounds.midX, y: 0)
+        }
+        context.draw(image, in: aspectFillRect(for: image, in: bounds))
+
+        guard let output = context.makeImage() else {
+            throw StripRenderError.contextCreationFailed
+        }
+        return output
+    }
+
     /// The rect to draw `image` into so it covers `bounds` with no distortion,
     /// overflowing on whichever axis is long. The caller clips to `bounds`.
     static func aspectFillRect(for image: CGImage, in bounds: CGRect) -> CGRect {

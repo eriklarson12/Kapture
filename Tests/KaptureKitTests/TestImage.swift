@@ -44,6 +44,36 @@ enum TestImage {
         return context.makeImage()!
     }
 
+    /// A red stripe down the leftmost tenth, then black to the midpoint, then
+    /// white. Aspect-filling a wide source into a squarer box crops the stripe
+    /// away; squashing the whole width in would keep it. The stripe is what
+    /// tells the two apart, because a centred boundary moves for neither.
+    static func edgeMarked(width: Int = 640, height: Int = 360) -> CGImage {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width / 2, height: height))
+        context.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: width / 2, y: 0, width: width - width / 2, height: height))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width / 10, height: height))
+        return context.makeImage()!
+    }
+
+    /// The green channel, which is 0 in both the black and the red bands of
+    /// `edgeMarked` and 255 in the white one.
+    static func green(_ image: CGImage, x: Int, y: Int) -> UInt8 {
+        pixels(image)[y * image.width * 4 + x * 4 + 1]
+    }
+
     /// Raw RGBA bytes in a fixed layout, so two images can be compared without
     /// depending on the format a decoder happened to choose.
     static func pixels(_ image: CGImage) -> [UInt8] {

@@ -187,4 +187,96 @@ struct RecipeRendererTests {
             #expect(TestImage.pixels(bare) != TestImage.pixels(captioned))
         }
     }
+
+    // MARK: - Animation frames
+
+    /// The classic strip's photo aspect is 1.39 against a 4:3 test frame, so
+    /// aspect-fill overflows vertically and the full source width survives.
+    /// Every sample below at a small x therefore reads the source's left edge.
+    private func animationFrames(
+        _ store: StripStore, _ recipe: StripRecipe
+    ) throws -> [CGImage] {
+        try RecipeRenderer(store: store).renderFrames(recipe, height: 400)
+    }
+
+    @Test("renderFrames gives one image per shot, at the template's photo aspect")
+    func renderFramesShape() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+            let frames = try animationFrames(store, recipe)
+
+            #expect(frames.count == 4)
+            for frame in frames {
+                let aspect = CGFloat(frame.width) / CGFloat(frame.height)
+                #expect(abs(aspect - template.photoAspect) < 0.01)
+                // H.264 will not take an odd dimension, and the GIF has no
+                // reason to be sized differently from the movie.
+                #expect(frame.width.isMultiple(of: 2))
+                #expect(frame.height.isMultiple(of: 2))
+            }
+        }
+    }
+
+    @Test("the recipe's filter reaches the animation frames")
+    func renderFramesFilters() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let coloured = (0..<4).map {
+                CaptureFrame(index: $0, image: TestImage.edgeMarked(width: 640, height: 480))
+            }
+            let plain = try store.save(
+                frames: coloured, templateID: template.id, mirrorOutput: false
+            )
+            var greyed = plain
+            greyed.filter = .blackAndWhite
+
+            // Asserted first, so a sample point that missed the red stripe
+            // could not make the filter look like it worked.
+            let colour = try animationFrames(store, plain)[0]
+            #expect(TestImage.red(colour, x: 2, y: colour.height / 2) > 200)
+            #expect(TestImage.green(colour, x: 2, y: colour.height / 2) < 50)
+
+            let mono = try animationFrames(store, greyed)[0]
+            let row = mono.height / 2
+            #expect(TestImage.red(mono, x: 2, y: row) == TestImage.green(mono, x: 2, y: row))
+        }
+    }
+
+    @Test("mirrorOutput flips the animation frames, like it flips the paper")
+    func renderFramesMirror() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let frames = asymmetricFrames(4)
+            let plain = try store.save(
+                frames: frames, templateID: template.id, mirrorOutput: false
+            )
+            let mirrored = try store.save(
+                frames: frames, templateID: template.id, mirrorOutput: true
+            )
+
+            let left = try animationFrames(store, plain)[0]
+            let flipped = try animationFrames(store, mirrored)[0]
+            #expect(TestImage.red(left, x: 5, y: left.height / 2) == 0)
+            #expect(TestImage.red(flipped, x: 5, y: flipped.height / 2) == 255)
+        }
+    }
+
+    /// The bug this is most likely to have: reading `photoAspect` off the
+    /// template rather than off the template with the strip's own overrides
+    /// applied, so a GIF is framed differently from the paper it came from.
+    @Test("a style override changes the animation crop too")
+    func renderFramesFollowsStyle() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+            var styled = recipe
+            styled.style = StripStyle(outerInset: 20)
+
+            let plain = try animationFrames(store, recipe)[0]
+            let wider = try animationFrames(store, styled)[0]
+            #expect(plain.height == wider.height)
+            #expect(plain.width != wider.width)
+        }
+    }
 }

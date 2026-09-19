@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 @testable import KaptureKit
 
@@ -33,6 +34,59 @@ struct ImageCodecTests {
     func rejectsGarbage() {
         #expect(throws: ImageCodecError.decodeFailed) {
             try ImageCodec.decodePNG(Data([0x00, 0x01, 0x02, 0x03]))
+        }
+    }
+
+    // MARK: - GIF
+
+    private func gifSource(_ data: Data) -> CGImageSource? {
+        CGImageSourceCreateWithData(data as CFData, nil)
+    }
+
+    private func gifProperties(_ source: CGImageSource, at index: Int) -> [CFString: Any]? {
+        (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any])?[
+            kCGImagePropertyGIFDictionary
+        ] as? [CFString: Any]
+    }
+
+    @Test("a GIF carries every frame it was given")
+    func gifFrameCount() throws {
+        let data = try ImageCodec.encodeGIF(TestImage.frames(4, width: 40, height: 30), delaySeconds: 0.6)
+        let source = try #require(gifSource(data))
+        #expect(CGImageSourceGetCount(source) == 4)
+    }
+
+    /// Both keys, because the clamped one is floored by decoders and the
+    /// unclamped one is unknown to the old ones. A GIF that writes only one
+    /// plays at the wrong speed somewhere.
+    @Test("a GIF records its delay in both the clamped and unclamped keys")
+    func gifDelay() throws {
+        let data = try ImageCodec.encodeGIF(TestImage.frames(2, width: 40, height: 30), delaySeconds: 0.6)
+        let source = try #require(gifSource(data))
+        let properties = try #require(gifProperties(source, at: 0))
+
+        let unclamped = try #require(properties[kCGImagePropertyGIFUnclampedDelayTime] as? Double)
+        let clamped = try #require(properties[kCGImagePropertyGIFDelayTime] as? Double)
+        #expect(abs(unclamped - 0.6) < 0.001)
+        #expect(abs(clamped - 0.6) < 0.001)
+    }
+
+    @Test("a GIF loops forever")
+    func gifLoops() throws {
+        let data = try ImageCodec.encodeGIF(TestImage.frames(2, width: 40, height: 30), delaySeconds: 0.6)
+        let source = try #require(gifSource(data))
+        let properties = try #require(
+            (CGImageSourceCopyProperties(source, nil) as? [CFString: Any])?[
+                kCGImagePropertyGIFDictionary
+            ] as? [CFString: Any]
+        )
+        #expect(properties[kCGImagePropertyGIFLoopCount] as? Int == 0)
+    }
+
+    @Test("a GIF with no frames is refused rather than written empty")
+    func gifRejectsEmpty() {
+        #expect(throws: ImageCodecError.encodeFailed) {
+            try ImageCodec.encodeGIF([], delaySeconds: 0.6)
         }
     }
 }

@@ -103,4 +103,51 @@ struct StripRendererTests {
         #expect(fitted.width == 100)
         #expect(fitted.height == 100)
     }
+
+    @Test("a standalone photo comes out at the size it was asked for")
+    func photoSize() throws {
+        let photo = try StripRenderer.photo(
+            TestImage.asymmetric(), size: CGSize(width: 400, height: 300)
+        )
+        #expect(photo.width == 400)
+        #expect(photo.height == 300)
+    }
+
+    /// The distinction that matters for an animation export: a 16:9 shot in a
+    /// 4:3 frame must lose its edges, not be squeezed. A centred boundary sits
+    /// in the middle either way, so the marked edge is what proves it.
+    @Test("a standalone photo is cropped, not squashed")
+    func photoCrops() throws {
+        let photo = try StripRenderer.photo(
+            TestImage.edgeMarked(width: 640, height: 360),
+            size: CGSize(width: 400, height: 300)
+        )
+        let row = photo.height / 2
+
+        // Red would be here if the full width had been squeezed in.
+        #expect(TestImage.red(photo, x: 2, y: row) == 0)
+        #expect(TestImage.green(photo, x: 2, y: row) == 0)
+        // And the black/white boundary is still centred.
+        #expect(TestImage.green(photo, x: 190, y: row) == 0)
+        #expect(TestImage.green(photo, x: 210, y: row) == 255)
+    }
+
+    @Test("a mirrored standalone photo puts the right half on the left")
+    func photoMirrors() throws {
+        let size = CGSize(width: 400, height: 300)
+        let plain = try StripRenderer.photo(TestImage.asymmetric(), size: size)
+        let flipped = try StripRenderer.photo(
+            TestImage.asymmetric(), size: size, mirrored: true
+        )
+        #expect(TestImage.red(plain, x: 20, y: 150) == 0)
+        #expect(TestImage.red(flipped, x: 20, y: 150) == 255)
+        #expect(TestImage.red(flipped, x: 380, y: 150) == 0)
+    }
+
+    @Test("a photo with no area is refused rather than drawn")
+    func photoRejectsEmptySize() {
+        #expect(throws: StripRenderError.contextCreationFailed) {
+            try StripRenderer.photo(TestImage.asymmetric(), size: CGSize(width: 0, height: 100))
+        }
+    }
 }

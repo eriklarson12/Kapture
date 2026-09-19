@@ -44,6 +44,34 @@ public struct RecipeRenderer: Sendable {
         )
     }
 
+    /// The recipe's photos as standalone images: filtered, mirrored, and
+    /// cropped to the aspect the strip crops them to. Both animation exports
+    /// consume this, so a GIF cannot drift from the strip it came from.
+    ///
+    /// The style is resolved before `photoAspect` is read. A strip overriding
+    /// `outerInset` crops its photos differently from its own template, and an
+    /// animation that ignored the override would be framed differently from the
+    /// paper it came from.
+    public func renderFrames(_ recipe: StripRecipe, height: CGFloat) throws -> [CGImage] {
+        let template = try template(for: recipe).applying(recipe.style)
+        let size = Self.evenSize(height: height, aspect: template.photoAspect)
+        return try store.loadFrames(for: recipe).map { frame in
+            try StripRenderer.photo(
+                FilterRenderer.apply(recipe.filter, to: frame),
+                size: size,
+                mirrored: recipe.mirrorOutput
+            )
+        }
+    }
+
+    /// `height` by `height * aspect`, both rounded to even numbers. H.264
+    /// rejects odd dimensions, and there is no reason for a GIF and a movie of
+    /// the same strip to disagree on size.
+    static func evenSize(height: CGFloat, aspect: CGFloat) -> CGSize {
+        func even(_ value: CGFloat) -> CGFloat { max(2, (value / 2).rounded() * 2) }
+        return CGSize(width: even(height * aspect), height: even(height))
+    }
+
     /// Resolves a background asset out of the strip's own package, so
     /// `StripRenderer` keeps doing no I/O. Nil for every background that is
     /// just colour, which is all of them until someone picks a picture.

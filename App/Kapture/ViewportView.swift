@@ -142,9 +142,16 @@ struct ViewportView: View {
 
                     redo(shots: strip.recipe.frameIDs.count)
 
-                    Button(model.isExporting ? "Saving" : "Save PNG") {
+                    // A split button rather than three: PNG keeps the click
+                    // and Cmd-S it has always had, and Tier 3 has three more
+                    // export formats queued behind these two.
+                    Menu(model.isExporting ? "Saving" : "Save") {
+                        Button("Animated GIF\u{2026}") { Task { await model.exportGIF() } }
+                        Button("Movie\u{2026}") { Task { await model.exportMovie() } }
+                    } primaryAction: {
                         Task { await model.exportStrip() }
                     }
+                    .menuStyle(.button)
                     .frame(minWidth: 110, minHeight: 44)
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(model.isExporting)

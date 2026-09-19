@@ -6,7 +6,7 @@ Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Status
 
-The core loop works: press a button, get four photos on a countdown, see the strip, style it, save a 300 dpi PNG. See Roadmap below.
+The core loop works: press a button, get four photos on a countdown, see the strip, style it, save it as a 300 dpi PNG, a looping GIF or a movie. See Roadmap below.
 
 ## How it works
 
@@ -83,10 +83,10 @@ Working:
 - Retaking a single shot without redoing the run
 - Captions set in type at output resolution, not scaled from the preview
 - PNG export at 300 dpi, a true 2x6 inches
+- Animated GIF and MP4 export of the shots, cropped and filtered exactly as the strip crops them
 
 Planned:
 
-- Animated GIF and MP4 export
 - A gallery of past strips, re-editable
 - User-authored templates as shareable files
 - Fullscreen kiosk mode

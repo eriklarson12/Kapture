@@ -8,8 +8,9 @@ public enum ImageCodecError: Error, Equatable {
     case decodeFailed
 }
 
-/// The one place images become bytes and back. Both the frame store and the
-/// strip export go through here, so the encoder is configured once.
+/// The one place images become bytes and back. The frame store, the strip
+/// export and the animated GIF export all go through here, so every encoder is
+/// configured once.
 ///
 /// PNG rather than HEIC, deliberately: the round trip is pixel-exact, which is
 /// what makes the frame store testable by comparing images rather than by
@@ -47,6 +48,42 @@ public enum ImageCodec {
             throw ImageCodecError.decodeFailed
         }
         return image
+    }
+
+    /// Encodes `frames` as a GIF that loops forever, holding each frame for
+    /// `delaySeconds`.
+    ///
+    /// Both delay keys are written on purpose. Decoders clamp
+    /// `kCGImagePropertyGIFDelayTime` to a floor — historically 0.1s, in some
+    /// browsers higher — and `kCGImagePropertyGIFUnclampedDelayTime` is the one
+    /// that carries the real number, but older readers do not know it exists.
+    /// Writing one of the two gets timing that is wrong somewhere.
+    public static func encodeGIF(_ frames: [CGImage], delaySeconds: Double) throws -> Data {
+        guard !frames.isEmpty else { throw ImageCodecError.encodeFailed }
+        let buffer = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            buffer, UTType.gif.identifier as CFString, frames.count, nil
+        ) else {
+            throw ImageCodecError.encodeFailed
+        }
+
+        // Loop count 0 is forever, which is the one thing a booth GIF must do.
+        CGImageDestinationSetProperties(destination, [
+            kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]
+        ] as CFDictionary)
+
+        let frameProperties = [
+            kCGImagePropertyGIFDictionary: [
+                kCGImagePropertyGIFUnclampedDelayTime: delaySeconds,
+                kCGImagePropertyGIFDelayTime: delaySeconds
+            ]
+        ] as CFDictionary
+        for frame in frames {
+            CGImageDestinationAddImage(destination, frame, frameProperties)
+        }
+
+        guard CGImageDestinationFinalize(destination) else { throw ImageCodecError.encodeFailed }
+        return buffer as Data
     }
 
     /// The resolution recorded in `data`, or nil if it carries none. Exists so
