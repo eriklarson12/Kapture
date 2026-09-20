@@ -26,6 +26,16 @@ struct SheetLayoutTests {
         #expect(places[0] == CGRect(x: 0, y: 0, width: 288, height: 432))
     }
 
+    /// A grid is already the size of the stock, so it prints once and is not
+    /// cut. Nothing in `SheetLayout` knows about columns; this is here so that
+    /// stays true.
+    @Test("a 2x2 grid fills the sheet once, uncut")
+    func gridFillsOnce() {
+        let places = sheet.placements(for: BuiltInTemplates.gridQuad)
+        #expect(places.count == 1)
+        #expect(places[0] == CGRect(x: 0, y: 0, width: 288, height: 432))
+    }
+
     /// Scaled rather than cropped. A cropped strip prints with one border
     /// missing and reads as a printer fault rather than as a layout that did
     /// not fit.

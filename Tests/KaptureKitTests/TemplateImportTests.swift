@@ -10,6 +10,7 @@ struct TemplateImportTests {
         id: String = "user-test",
         name: String = "Test",
         frameCount: Int = 4,
+        columns: Int = 1,
         canvasSize: CGSize = CGSize(width: 144, height: 432),
         outerInset: CGFloat = 8,
         gutter: CGFloat = 6,
@@ -19,7 +20,8 @@ struct TemplateImportTests {
         captionFontSize: CGFloat = 9
     ) -> StripTemplate {
         StripTemplate(
-            id: id, name: name, frameCount: frameCount, canvasSize: canvasSize,
+            id: id, name: name, frameCount: frameCount, columns: columns,
+            canvasSize: canvasSize,
             outerInset: outerInset, gutter: gutter, footerHeight: footerHeight,
             cornerRadius: cornerRadius, background: background,
             captionFontSize: captionFontSize
@@ -70,6 +72,7 @@ struct TemplateImportTests {
         """
         let template = try TemplateImport.decode(Data(json.utf8))
         #expect(template.frameCount == 3)
+        #expect(template.columns == 1)
         #expect(template.cornerRadius == 0)
         #expect(template.foreground == .ink)
         #expect(template.background == .solid(.paper))
@@ -109,6 +112,42 @@ struct TemplateImportTests {
         """
         let template = try TemplateImport.decode(Data(json.utf8))
         #expect(template.canvasSize == CGSize(width: 144, height: 432))
+    }
+
+    @Test("a grid survives the round trip")
+    func roundTripGrid() throws {
+        let template = BuiltInTemplates.gridQuad.derived(name: "Quad Copy")
+        let restored = try TemplateImport.decode(try TemplateImport.encode(template))
+        #expect(restored == template)
+        #expect(restored.columns == 2)
+    }
+
+    /// Every template file 5.1 wrote predates the key. They all have to keep
+    /// opening, as the stacks they are.
+    @Test("a file written before columns existed decodes as a stack")
+    func columnsDefaultOnOldFile() throws {
+        let json = """
+        {
+          "id": "user-old",
+          "name": "Old",
+          "frameCount": 4,
+          "canvasSize": { "width": 144, "height": 432 },
+          "outerInset": 8,
+          "gutter": 6,
+          "footerHeight": 30,
+          "cornerRadius": 0,
+          "background": {
+            "kind": "solid",
+            "color": { "red": 1, "green": 1, "blue": 1, "alpha": 1 }
+          },
+          "foreground": { "red": 0, "green": 0, "blue": 0, "alpha": 1 },
+          "captionFontSize": 9,
+          "captionAlignment": "center"
+        }
+        """
+        let template = try TemplateImport.decode(Data(json.utf8))
+        #expect(template.columns == 1)
+        #expect(template.photoRects().count == 4)
     }
 
     // MARK: - Refusals
@@ -184,6 +223,16 @@ struct TemplateImportTests {
         rejects(custom(frameCount: 13), .frameCount(13))
     }
 
+    /// A ragged grid renders a half-empty last row, which on paper reads as a
+    /// missing photo rather than as a layout.
+    @Test("refuses a column count that does not divide the shots")
+    func columns() {
+        rejects(custom(frameCount: 4, columns: 3), .columns(3))
+        rejects(custom(frameCount: 4, columns: 0), .columns(0))
+        rejects(custom(frameCount: 4, columns: -2), .columns(-2))
+        rejects(custom(frameCount: 5, columns: 2), .columns(2))
+    }
+
     @Test("refuses a canvas that is not a printable page")
     func canvasSize() {
         let empty = CGSize(width: 0, height: 432)
@@ -234,7 +283,7 @@ struct TemplateImportTests {
     func messages() {
         let errors: [TemplateImportError] = [
             .unreadable("x"), .invalidID("x"), .reservedID("x"), .missingName,
-            .frameCount(0), .canvasSize(.zero), .negativeMetric("gutter"),
+            .frameCount(0), .columns(3), .canvasSize(.zero), .negativeMetric("gutter"),
             .captionFontSize(1), .imageBackground, .noRoomForPhotos,
         ]
         for error in errors {

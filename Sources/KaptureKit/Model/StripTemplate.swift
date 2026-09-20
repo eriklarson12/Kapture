@@ -12,10 +12,16 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var frameCount: Int
+    /// Photos per row. 1 is the classic stack; 2 is a grid two across. The
+    /// grid fills row-major, so element 0 is the top-left photo and the frames
+    /// zip against `photoRects()` exactly as they always have.
+    public var columns: Int
     public var canvasSize: CGSize
     /// Border thickness on all four sides.
     public var outerInset: CGFloat
-    /// Vertical space between adjacent photos.
+    /// Space between adjacent photos, in both directions. A grid's horizontal
+    /// gap and a stack's vertical gap are the same visual thing, so they are
+    /// the same number rather than two fields kept equal by hand.
     public var gutter: CGFloat
     /// Reserved strip along the bottom for a caption or date.
     public var footerHeight: CGFloat
@@ -30,6 +36,7 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
         id: String,
         name: String,
         frameCount: Int,
+        columns: Int = 1,
         canvasSize: CGSize,
         outerInset: CGFloat,
         gutter: CGFloat,
@@ -43,6 +50,7 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
         self.id = id
         self.name = name
         self.frameCount = frameCount
+        self.columns = columns
         self.canvasSize = canvasSize
         self.outerInset = outerInset
         self.gutter = gutter
@@ -57,14 +65,30 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
     /// False when the chrome leaves no room for the photos it claims to hold.
     public var isValid: Bool {
         frameCount > 0
+            && columns > 0
             && canvasSize.width > 0
             && canvasSize.height > 0
             && photoHeight > 0
             && photoWidth > 0
     }
 
-    public var photoWidth: CGFloat {
+    /// How many rows the photos occupy. Ceiling division, so a template that
+    /// reached here without passing `TemplateImport.validate` still lays out
+    /// every photo it claims rather than dropping the last row.
+    public var rows: Int {
+        guard columns > 0 else { return 0 }
+        return (frameCount + columns - 1) / columns
+    }
+
+    /// The full width inside the border: one photo wide in a stack, and the
+    /// band a caption is laid out in whatever the column count.
+    public var contentWidth: CGFloat {
         canvasSize.width - outerInset * 2
+    }
+
+    public var photoWidth: CGFloat {
+        guard columns > 0 else { return 0 }
+        return (contentWidth - gutter * CGFloat(columns - 1)) / CGFloat(columns)
     }
 
     /// The aspect every photo is cropped to. The live preview must be framed to
@@ -75,22 +99,25 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
     }
 
     public var photoHeight: CGFloat {
-        guard frameCount > 0 else { return 0 }
-        let chrome = outerInset * 2 + footerHeight + gutter * CGFloat(frameCount - 1)
-        return (canvasSize.height - chrome) / CGFloat(frameCount)
+        let rowCount = rows
+        guard rowCount > 0 else { return 0 }
+        let chrome = outerInset * 2 + footerHeight + gutter * CGFloat(rowCount - 1)
+        return (canvasSize.height - chrome) / CGFloat(rowCount)
     }
 
     /// Photo frames in CoreGraphics coordinates, whose origin is bottom-left.
-    /// Element 0 is the first shot and sits at the top of the strip.
+    /// Element 0 is the first shot: the top of a stack, the top-left of a grid.
     public func photoRects() -> [CGRect] {
         guard isValid else { return [] }
+        let width = photoWidth
         let height = photoHeight
+        let rowCount = rows
         return (0..<frameCount).map { index in
-            let fromBottom = CGFloat(frameCount - 1 - index)
+            let fromBottom = CGFloat(rowCount - 1 - index / columns)
             return CGRect(
-                x: outerInset,
+                x: outerInset + CGFloat(index % columns) * (width + gutter),
                 y: outerInset + footerHeight + fromBottom * (height + gutter),
-                width: photoWidth,
+                width: width,
                 height: height
             )
         }
@@ -99,7 +126,7 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
     /// The footer band, empty when the template reserves no room for one.
     public func footerRect() -> CGRect {
         guard isValid, footerHeight > 0 else { return .zero }
-        return CGRect(x: outerInset, y: outerInset, width: photoWidth, height: footerHeight)
+        return CGRect(x: outerInset, y: outerInset, width: contentWidth, height: footerHeight)
     }
 
     /// A copy with the style's set fields applied. Resolving overrides here is
@@ -160,7 +187,7 @@ extension StripTemplate: Codable {
     /// its geometry and inherit the rest, which is the difference between a
     /// format and a dump.
     public enum CodingKeys: String, CodingKey, CaseIterable {
-        case id, name, frameCount, canvasSize
+        case id, name, frameCount, columns, canvasSize
         case outerInset, gutter, footerHeight, cornerRadius
         case background, foreground, captionFontSize, captionAlignment
     }
@@ -175,6 +202,7 @@ extension StripTemplate: Codable {
             id: try container.decode(String.self, forKey: .id),
             name: try container.decode(String.self, forKey: .name),
             frameCount: try container.decode(Int.self, forKey: .frameCount),
+            columns: try container.decodeIfPresent(Int.self, forKey: .columns) ?? 1,
             canvasSize: try Self.decodeSize(from: container),
             outerInset: try container.decode(CGFloat.self, forKey: .outerInset),
             gutter: try container.decode(CGFloat.self, forKey: .gutter),
@@ -196,6 +224,7 @@ extension StripTemplate: Codable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(frameCount, forKey: .frameCount)
+        try container.encode(columns, forKey: .columns)
         var size = container.nestedContainer(keyedBy: SizeKeys.self, forKey: .canvasSize)
         try size.encode(canvasSize.width, forKey: .width)
         try size.encode(canvasSize.height, forKey: .height)

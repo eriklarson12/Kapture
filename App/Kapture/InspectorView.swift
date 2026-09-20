@@ -111,6 +111,12 @@ struct InspectorView: View {
             Button("Import Template\u{2026}") { Task { await model.importTemplate() } }
             Button("Save Template\u{2026}") { Task { await model.saveTemplate() } }
                 .disabled(model.strip == nil)
+            // Named for what it does. Editing a built-in copies it first, and
+            // a menu item that said otherwise would be lying about which
+            // template the sheet is about to change.
+            Button(model.canRemoveTemplate ? "Edit Template\u{2026}" : "Duplicate & Edit\u{2026}") {
+                model.editTemplate()
+            }
             Divider()
             Button("Remove Template") { Task { await model.removeTemplate() } }
                 .disabled(!model.canRemoveTemplate)

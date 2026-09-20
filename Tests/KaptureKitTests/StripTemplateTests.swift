@@ -18,6 +18,81 @@ struct StripTemplateTests {
         }
     }
 
+    // MARK: - Grids
+
+    /// Row-major, and element 0 is the top-left. Frames are zipped against
+    /// this order, so reversing it would silently shuffle the photos.
+    @Test("a grid fills row by row, first shot top-left")
+    func gridOrder() {
+        let rects = BuiltInTemplates.gridQuad.photoRects()
+        #expect(rects.count == 4)
+        #expect(rects[0].minX < rects[1].minX)
+        #expect(rects[0].minY == rects[1].minY)
+        #expect(rects[2].minY < rects[0].minY)
+        #expect(rects[2].minX == rects[0].minX)
+        #expect(rects[3].minX == rects[1].minX)
+        #expect(rects[3].minY == rects[2].minY)
+    }
+
+    @Test("a grid divides the width between its columns")
+    func gridWidth() {
+        let template = BuiltInTemplates.gridQuad
+        let expectedWidth: CGFloat = 123   // (288 - 16*2 - 10) / 2
+        let expectedHeight: CGFloat = 177  // (432 - 16*2 - 36 - 10) / 2
+        #expect(template.rows == 2)
+        #expect(template.contentWidth == 256)
+        #expect(template.photoWidth == expectedWidth)
+        #expect(template.photoHeight == expectedHeight)
+    }
+
+    /// The caption band spans the paper, not one column. Reusing `photoWidth`
+    /// for it would have shrunk the footer to half the strip the moment a
+    /// second column existed.
+    @Test("the footer spans the paper whatever the column count")
+    func gridFooter() {
+        let template = BuiltInTemplates.gridQuad
+        #expect(template.footerRect().width == template.contentWidth)
+        #expect(template.footerRect().width > template.photoWidth)
+        for rect in template.photoRects() {
+            #expect(rect.minY >= template.footerRect().maxY)
+        }
+    }
+
+    @Test("a grid at 300 dpi is the page it says it is")
+    func gridPrintSize() {
+        #expect(BuiltInTemplates.gridQuad.pixelSize(atDPI: 300) == CGSize(width: 1200, height: 1800))
+    }
+
+    /// `TemplateImport` refuses this, so it can only arrive from code. It must
+    /// still lay out every photo rather than divide by zero or lose a row.
+    @Test("a ragged grid still emits one rect per photo")
+    func raggedGrid() {
+        let ragged = StripTemplate(
+            id: "ragged", name: "Ragged", frameCount: 5, columns: 2,
+            canvasSize: CGSize(width: 288, height: 432),
+            outerInset: 16, gutter: 10, footerHeight: 36
+        )
+        #expect(ragged.rows == 3)
+        #expect(ragged.photoRects().count == 5)
+        let canvas = CGRect(origin: .zero, size: ragged.canvasSize)
+        for rect in ragged.photoRects() {
+            #expect(canvas.contains(rect))
+        }
+    }
+
+    @Test("a template with no columns is invalid rather than fatal")
+    func zeroColumns() {
+        let none = StripTemplate(
+            id: "none", name: "None", frameCount: 4, columns: 0,
+            canvasSize: CGSize(width: 144, height: 432),
+            outerInset: 8, gutter: 6, footerHeight: 30
+        )
+        #expect(none.rows == 0)
+        #expect(none.photoWidth == 0)
+        #expect(none.isValid == false)
+        #expect(none.photoRects().isEmpty)
+    }
+
     @Test("keeps every rect inside the canvas")
     func withinCanvas() {
         for template in BuiltInTemplates.all {
@@ -28,13 +103,22 @@ struct StripTemplateTests {
         }
     }
 
-    @Test("never overlaps adjacent photos")
+    /// Stated per row now that a grid exists: two photos side by side share a
+    /// row, so the old "every rect is above the next" rule is only true down a
+    /// column.
+    @Test("never overlaps two photos")
     func noOverlap() {
         for template in BuiltInTemplates.all {
             let rects = template.photoRects()
-            for (upper, lower) in zip(rects, rects.dropFirst()) {
-                #expect(upper.minY >= lower.maxY)
+            for (first, second) in pairs(of: rects) {
+                #expect(first.intersects(second) == false)
             }
+        }
+    }
+
+    private func pairs(of rects: [CGRect]) -> [(CGRect, CGRect)] {
+        rects.indices.flatMap { index in
+            rects[(index + 1)...].map { (rects[index], $0) }
         }
     }
 

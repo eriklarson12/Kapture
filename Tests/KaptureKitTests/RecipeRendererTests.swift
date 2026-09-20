@@ -336,6 +336,26 @@ struct RecipeRendererTests {
         }
     }
 
+    /// One recipe, two papers, nothing re-shot. This is ADR-003 doing its job:
+    /// the grid is a different arrangement of the same four stored frames.
+    @Test("the same four frames render as a stack or as a grid")
+    func rendersAGrid() throws {
+        try withStore { store in
+            let grid = BuiltInTemplates.gridQuad
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: grid.id)
+            let rendered = try RecipeRenderer(store: store).render(recipe)
+            #expect(rendered.width == Int(grid.canvasSize.width))
+            #expect(rendered.height == Int(grid.canvasSize.height))
+
+            var restacked = recipe
+            restacked.templateID = BuiltInTemplates.wideStrip.id
+            let stacked = try RecipeRenderer(store: store).render(restacked)
+            // Same paper, same frames, different arrangement.
+            #expect(stacked.width == rendered.width)
+            #expect(stacked.height == rendered.height)
+        }
+    }
+
     @Test("resolving without a dpi leaves the frames at their stored size")
     func resolveKeepsNativeFrames() throws {
         try withStore { store in

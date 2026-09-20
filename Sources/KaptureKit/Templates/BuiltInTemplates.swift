@@ -39,7 +39,24 @@ public enum BuiltInTemplates {
         cornerRadius: 4
     )
 
-    public static let all: [StripTemplate] = [classicStrip, tripleStrip, wideStrip]
+    /// Four shots as a 2x2 grid on a 4x6 print. One sheet, one print, no cut,
+    /// where a 2x6 strip is printed twice and cut apart.
+    ///
+    /// Its photos are portrait where a strip's are landscape, so the live
+    /// preview letterbox turns with it. That is the layout, not a fault.
+    public static let gridQuad = StripTemplate(
+        id: "grid-quad",
+        name: "Quad Grid",
+        frameCount: 4,
+        columns: 2,
+        canvasSize: CGSize(width: 288, height: 432),
+        outerInset: 16,
+        gutter: 10,
+        footerHeight: 36,
+        cornerRadius: 4
+    )
+
+    public static let all: [StripTemplate] = [classicStrip, tripleStrip, wideStrip, gridQuad]
 
     /// Keyed for `RecipeRenderer`, which resolves a recipe's `templateID`.
     /// Item 5.2 adds user templates by adding entries, not by adding a

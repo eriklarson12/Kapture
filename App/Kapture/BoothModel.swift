@@ -47,6 +47,8 @@ final class BoothModel {
     /// or removed. Separate from `errorMessage`, which is titled as a failure
     /// and would be the wrong frame for "Added a template".
     var notice: String?
+    /// The template the editor is open on, if it is open. Nil dismisses it.
+    var editingTemplate: TemplateEdit?
 
     /// Guards against an out-of-order render. Dragging a colour emits a stream
     /// of edits, and a slow render landing after a fast one would show a strip
@@ -243,6 +245,16 @@ final class BoothModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Renders the shown strip again without changing its recipe.
+    ///
+    /// A template edit changes what a recipe *means* rather than what it says,
+    /// so `restyle` sees no difference and returns early. Nothing is persisted:
+    /// the recipe on disk is already correct.
+    func refreshStrip() async {
+        guard let recipe = strip?.recipe else { return }
+        await present(recipe, persisting: false)
     }
 
     /// Renders, optionally persists, and shows. The generation guard lives here

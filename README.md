@@ -33,7 +33,8 @@ KaptureKit/          engine: models, layout math, renderer, storage
 App/                 SwiftUI shell
   BoothModel.swift           app state and policy
   StripExport.swift          export, clipboard and print policy
-  TemplateExchange.swift     saving, importing and removing a template
+  TemplateExchange.swift     saving, importing, editing and removing a template
+  TemplateEditorView.swift   the template editor sheet
   AVFoundationCamera.swift   the only file that touches a camera
 ```
 
@@ -43,7 +44,11 @@ A strip on disk is a single package directory holding its recipe, its frames, an
 
 Styling a strip writes optional overrides onto its recipe rather than editing the template it uses. A value the user never touched keeps following the template, so changing a template still changes every strip that did not override it.
 
-A template is a small JSON file, written with its fields named so it can be edited in a text editor. Saving one takes the strip's current look rather than the layout it started from. Importing one checks it first: a file that would redefine a built-in, or that leaves no room for the photos, is refused with a message saying which. Imported templates are kept alongside the strips, because a strip goes on referring to its template rather than swallowing a copy of it.
+A template is a small JSON file, written with its fields named so it can be edited in a text editor, and carrying its own extension so double-clicking it opens Kapture rather than a code editor. Saving one takes the strip's current look rather than the layout it started from. Importing one checks it first: a file that would redefine a built-in, or that leaves no room for the photos, is refused with a message saying which. Imported templates are kept alongside the strips, because a strip goes on referring to its template rather than swallowing a copy of it.
+
+That reference is also why editing a template moves the strips that use it. The editor changes the shot count, the number of columns, the paper and the chrome, with a wireframe of the layout that keeps up as you drag. One control is held still: the number of shots, once a strip already uses the template. Every other change makes a past strip look different, which is the point of keeping the reference; that one would stop it rendering at all.
+
+Photos can be stacked down a strip or arranged in a grid. The two are the same layout with a different number of columns, so a grid inherits every rule a strip already had rather than being a second thing to maintain.
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
@@ -80,7 +85,7 @@ Working:
 - Camera capture with a live mirrored preview
 - Countdown, capture flash, and a review beat between shots
 - Strip layout engine with aspect-fill cropping and scaled print export
-- Three built-in templates
+- Four built-in templates, three strips and a grid
 - Strips stored on disk as re-renderable recipes
 - Paper, ink, border and corner styling, applied per strip and re-rendered live
 - Gradient and picture backgrounds, with the picture kept inside the strip
@@ -92,12 +97,13 @@ Working:
 - PDF export as a real page: the page box measures a true 2x6 inches and the caption is embedded text, not pixels
 - Copy to the clipboard, as a photograph and as something a document can scale
 - Printing, two strips to a 4x6 sheet, at 100% so each one is a true two inches
-- Templates as shareable files: save a strip's layout as JSON, and import one back after it is checked
+- Templates as shareable files: save a strip's layout, and import one back after it is checked, or by double-clicking it in Finder
+- A template editor: shot count, columns, paper and chrome, with a live wireframe of the layout
+- Grid layouts alongside vertical stacks, including a 2x2 on a 4x6 print
 
 Planned:
 
 - A gallery of past strips, re-editable
-- A template editor, and grid layouts alongside vertical stacks
 - Fullscreen kiosk mode
 - Background replacement using Vision person segmentation
 

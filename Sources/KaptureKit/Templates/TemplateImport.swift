@@ -14,6 +14,8 @@ public enum TemplateImportError: Error, Equatable {
     case reservedID(String)
     case missingName
     case frameCount(Int)
+    /// Not positive, or does not divide the shot count evenly.
+    case columns(Int)
     case canvasSize(CGSize)
     /// A measurement that cannot be negative and is: border, gutter, footer,
     /// corner radius.
@@ -39,6 +41,11 @@ extension TemplateImportError: LocalizedError {
             "The template has no name."
         case .frameCount(let count):
             "A template holds between 1 and \(TemplateImport.frameCountLimit) photos, not \(count)."
+        case .columns(let columns):
+            columns > 0
+                ? "A grid \(columns) across cannot hold the photos evenly. "
+                    + "Use a column count that divides the number of shots."
+                : "A template needs at least one column."
         case .canvasSize(let size):
             "\(Int(size.width))x\(Int(size.height)) points is not a printable page. "
                 + "Sides run from 1 to \(Int(TemplateImport.canvasLimit)) points."
@@ -107,6 +114,9 @@ public enum TemplateImport {
         }
         guard (1...frameCountLimit).contains(template.frameCount) else {
             throw TemplateImportError.frameCount(template.frameCount)
+        }
+        guard template.columns > 0, template.frameCount % template.columns == 0 else {
+            throw TemplateImportError.columns(template.columns)
         }
         let size = template.canvasSize
         guard size.width > 0, size.height > 0,

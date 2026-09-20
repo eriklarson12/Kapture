@@ -4,6 +4,8 @@ import SwiftUI
 struct KaptureApp: App {
     /// Held here rather than in `ContentView` so the File menu can reach it.
     @State private var model = BoothModel()
+    /// Only so a template double-clicked in Finder has somewhere to land.
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
         WindowGroup {
