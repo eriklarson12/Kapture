@@ -7,12 +7,19 @@ struct ContentView: View {
     @Bindable var model: BoothModel
 
     var body: some View {
+        // The inspector is removed; the layout around it is not. Branching the
+        // whole view would give `ViewportView` a new identity, fire its
+        // `onDisappear`, and stop and restart the camera on every entry to
+        // kiosk — a black stall at exactly the wrong moment.
         HSplitView {
             ViewportView(model: model)
                 .frame(minWidth: 560)
-            InspectorView(model: model)
-                .frame(width: 280)
+            if !model.isKiosk {
+                InspectorView(model: model)
+                    .frame(width: 280)
+            }
         }
+        .kiosk(isOn: $model.isKiosk)
         // A sheet rather than more inspector: the inspector edits this strip,
         // and the editor edits a file that every strip naming it will follow.
         .sheet(item: $model.editingTemplate) { edit in

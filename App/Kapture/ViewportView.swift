@@ -5,6 +5,7 @@ import SwiftUI
 /// shot just taken during a review beat, and the finished strip after.
 struct ViewportView: View {
     let model: BoothModel
+    @FocusState private var hasKeys: Bool
 
     var body: some View {
         ZStack {
@@ -20,10 +21,32 @@ struct ViewportView: View {
             FlashOverlay(isFlashing: isFlashing)
         }
         .overlay(alignment: .top) { progress }
-        .overlay(alignment: .bottom) { controls }
+        .overlay(alignment: .bottom) { model.isKiosk ? AnyView(hint) : AnyView(controls) }
         .overlay(alignment: .center) { message }
         .task { await model.startCamera() }
         .onDisappear { model.stopCamera() }
+        // Kiosk has no buttons, so it has no keyboard shortcuts either: the
+        // keys are handled here, and only while the view holds focus.
+        .focusable(model.isKiosk)
+        .focusEffectDisabled()
+        .focused($hasKeys)
+        .onChange(of: model.isKiosk, initial: true) { _, kiosk in hasKeys = kiosk }
+        .onKeyPress(.space) {
+            guard model.isKiosk, model.canCapture else { return .ignored }
+            Task { await model.capture() }
+            return .handled
+        }
+        // Escape means "stop the current thing" everywhere else in macOS, so a
+        // run in progress is what it stops first. Kiosk is what it stops next.
+        .onKeyPress(.escape) {
+            guard model.isKiosk else { return .ignored }
+            if model.isRunning {
+                model.runner.cancel()
+            } else {
+                model.isKiosk = false
+            }
+            return .handled
+        }
     }
 
     @ViewBuilder
@@ -135,6 +158,21 @@ struct ViewportView: View {
         }
     }
 
+    /// The only chrome kiosk mode keeps. "Keyboard only" and "no labels" make a
+    /// mode nobody can use without being told how, so one dim line names the
+    /// keys, and goes away while the run it would interrupt is happening.
+    @ViewBuilder
+    private var hint: some View {
+        if !model.isRunning && !model.isBuilding {
+            Text(model.strip == nil
+                ? "Space to start   \u{00B7}   Esc to leave"
+                : "Space for another   \u{00B7}   \u{2318}S to save   \u{00B7}   Esc to leave")
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.45))
+                .padding(.bottom, 24)
+        }
+    }
+
     @ViewBuilder
     private var controls: some View {
         // Nothing to press mid-retake: the camera is busy and the strip on disk
@@ -165,7 +203,6 @@ struct ViewportView: View {
                     }
                     .menuStyle(.button)
                     .frame(minWidth: 110, minHeight: 44)
-                    .keyboardShortcut("s", modifiers: .command)
                     .disabled(model.isExporting)
                 } else {
                     Button(shutterLabel) { Task { await model.capture() } }

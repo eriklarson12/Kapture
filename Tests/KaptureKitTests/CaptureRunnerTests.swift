@@ -18,6 +18,17 @@ final class TestClock: CaptureClock {
     }
 }
 
+/// Records the cues a run emits, so the sound schedule is asserted the same
+/// way the wait schedule is rather than listened for.
+@MainActor
+final class TestCueSink: CaptureCueSink {
+    private(set) var played: [CaptureCue] = []
+
+    func play(_ cue: CaptureCue) {
+        played.append(cue)
+    }
+}
+
 @Suite("CaptureRunner")
 @MainActor
 struct CaptureRunnerTests {
@@ -28,6 +39,17 @@ struct CaptureRunnerTests {
         try await camera.start()
         let clock = TestClock()
         return (CaptureRunner(camera: camera, sequence: sequence, clock: clock), camera, clock)
+    }
+
+    private func makeRunner(
+        sequence: CaptureSequence = .standard,
+        cues: TestCueSink
+    ) async throws -> (CaptureRunner, StubCamera, TestClock) {
+        let camera = StubCamera()
+        try await camera.start()
+        let clock = TestClock()
+        let runner = CaptureRunner(camera: camera, sequence: sequence, clock: clock, cues: cues)
+        return (runner, camera, clock)
     }
 
     @Test("a full run captures every frame, in order")
@@ -170,5 +192,63 @@ struct CaptureRunnerTests {
         let frame = await runner.captureOne(frame: 0)
         #expect(frame == nil)
         #expect(runner.state == .failed(CaptureError.captureFailed("lens cap").localizedDescription))
+    }
+
+    // MARK: - Cues
+
+    @Test("a run ticks through every countdown, snaps with every flash, and chimes once")
+    func cueSchedule() async throws {
+        let sequence = CaptureSequence(frameCount: 3, countdownSeconds: 2, reviewSeconds: 1)
+        let cues = TestCueSink()
+        let (runner, _, _) = try await makeRunner(sequence: sequence, cues: cues)
+
+        await runner.run()
+
+        #expect(cues.played == [
+            .tick, .tick, .shutter,
+            .tick, .tick, .shutter,
+            .tick, .tick, .shutter,
+            .finished,
+        ])
+    }
+
+    /// The chime says "the strip is up". A retake re-renders a strip that is
+    /// already on screen, so there is nothing to turn round and look at.
+    @Test("a retake counts down and snaps, and does not chime")
+    func retakeDoesNotChime() async throws {
+        let sequence = CaptureSequence(frameCount: 4, countdownSeconds: 2, reviewSeconds: 1)
+        let cues = TestCueSink()
+        let (runner, _, _) = try await makeRunner(sequence: sequence, cues: cues)
+
+        _ = await runner.captureOne(frame: 1)
+
+        #expect(cues.played == [.tick, .tick, .shutter])
+    }
+
+    @Test("a cancelled run stops making noise at the beat it stopped on")
+    func cancelStopsCues() async throws {
+        let cues = TestCueSink()
+        let (runner, _, clock) = try await makeRunner(cues: cues)
+        // Countdown 3, 2, 1, the flash, then the review beat for frame 0.
+        clock.onWait = { count in
+            if count == 5 { runner.cancel() }
+        }
+
+        await runner.run()
+
+        #expect(cues.played == [.tick, .tick, .tick, .shutter])
+    }
+
+    /// A chime after a failure would be a lie. The error panel is the report.
+    @Test("a camera failure mid-run never chimes")
+    func failureDoesNotChime() async throws {
+        let cues = TestCueSink()
+        let (runner, camera, _) = try await makeRunner(cues: cues)
+        camera.failAtCapture = 2
+
+        await runner.run()
+
+        #expect(cues.played.contains(.finished) == false)
+        #expect(cues.played.filter { $0 == .shutter }.count == 3)
     }
 }

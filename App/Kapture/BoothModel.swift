@@ -23,6 +23,8 @@ enum CameraStatus: Equatable {
 @Observable
 final class BoothModel {
     let camera = AVFoundationCamera()
+    /// Built before the runner, because the runner is handed it.
+    let sounds = BoothSounds()
     let store: StripStore
     let templateStore: TemplateStore
     let runner: CaptureRunner
@@ -49,6 +51,10 @@ final class BoothModel {
     var notice: String?
     /// The template the editor is open on, if it is open. Nil dismisses it.
     var editingTemplate: TemplateEdit?
+    /// Fullscreen, no inspector, no buttons: the app pointed at a party rather
+    /// than at the person configuring it. Lives here because the View menu,
+    /// the layout and the key handling all read it.
+    var isKiosk = false
 
     /// Guards against an out-of-order render. Dragging a colour emits a stream
     /// of edits, and a slow render landing after a fast one would show a strip
@@ -123,7 +129,7 @@ final class BoothModel {
     init(root: URL = .kaptureSupportDirectory) {
         self.store = StripStore(root: root)
         self.templateStore = TemplateStore(root: root)
-        self.runner = CaptureRunner(camera: camera, sequence: .standard)
+        self.runner = CaptureRunner(camera: camera, sequence: .standard, cues: sounds)
         // A template that cannot be read leaves the built-ins standing. The
         // app must start.
         self.userTemplates = (try? templateStore.load()) ?? []

@@ -24,17 +24,20 @@ public final class CaptureRunner {
 
     private let camera: any CameraSource
     private let clock: any CaptureClock
+    private let cues: any CaptureCueSink
     private var isRunning = false
     private var stopRequested = false
 
     public init(
         camera: any CameraSource,
         sequence: CaptureSequence = .standard,
-        clock: any CaptureClock = SystemCaptureClock()
+        clock: any CaptureClock = SystemCaptureClock(),
+        cues: any CaptureCueSink = SilentCueSink()
     ) {
         self.camera = camera
         self.sequence = sequence
         self.clock = clock
+        self.cues = cues
     }
 
     /// True once every frame is in hand, which is when the strip can be built.
@@ -64,6 +67,7 @@ public final class CaptureRunner {
         }
 
         state = .finished
+        cues.play(.finished)
     }
 
     /// Re-shoots one slot of a strip that already exists.
@@ -71,7 +75,8 @@ public final class CaptureRunner {
     /// Deliberately does not touch `frames`: that array is the record of a
     /// whole run, and `isComplete` has to keep meaning "a run finished" rather
     /// than "the last thing that happened produced an image". There is no
-    /// review beat either — the re-rendered strip is the review.
+    /// review beat either — the re-rendered strip is the review, which is also
+    /// why it plays no `.finished` cue.
     public func captureOne(frame index: Int) async -> CaptureFrame? {
         guard !isRunning else { return nil }
         isRunning = true
@@ -90,6 +95,7 @@ public final class CaptureRunner {
     private func shoot(index: Int) async -> CaptureFrame? {
         for remaining in stride(from: sequence.countdownSeconds, through: 1, by: -1) {
             state = .countingDown(frame: index, secondsRemaining: remaining)
+            cues.play(.tick)
             await clock.wait(.seconds(1))
             if shouldStop { state = .idle; return nil }
         }
@@ -97,6 +103,7 @@ public final class CaptureRunner {
         // The flash is fill light, so it goes up *before* the shutter and
         // stays up through it. docs/design-system.md.
         state = .flashing(frame: index)
+        cues.play(.shutter)
         await clock.wait(.seconds(CaptureSequence.flashSeconds))
 
         do {

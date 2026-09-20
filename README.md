@@ -24,7 +24,8 @@ That one decision buys a lot:
 ```
 KaptureKit/          engine: models, layout math, renderer, storage
   Model/             StripTemplate, StripRecipe, StripStyle, StripBackground, CaptureFrame, RGBA
-  Capture/           CameraSource protocol, CaptureSequence, CaptureRunner
+  Capture/           CameraSource protocol, CaptureSequence, CaptureCue, CaptureRunner
+  Audio/             SoundCue: the countdown, shutter and finish sounds, as arithmetic
   Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer
   Export/            MovieRenderer, PDFRenderer, SheetLayout
   Storage/           StripStore, TemplateStore, ImageCodec
@@ -35,6 +36,8 @@ App/                 SwiftUI shell
   StripExport.swift          export, clipboard and print policy
   TemplateExchange.swift     saving, importing, editing and removing a template
   TemplateEditorView.swift   the template editor sheet
+  BoothSounds.swift          the cue sink: plays what the engine generated
+  KioskMode.swift            fullscreen plumbing for kiosk mode
   AVFoundationCamera.swift   the only file that touches a camera
 ```
 
@@ -49,6 +52,10 @@ A template is a small JSON file, written with its fields named so it can be edit
 That reference is also why editing a template moves the strips that use it. The editor changes the shot count, the number of columns, the paper and the chrome, with a wireframe of the layout that keeps up as you drag. One control is held still: the number of shots, once a strip already uses the template. Every other change makes a past strip look different, which is the point of keeping the reference; that one would stop it rendering at all.
 
 Photos can be stacked down a strip or arranged in a grid. The two are the same layout with a different number of columns, so a grid inherits every rule a strip already had rather than being a second thing to maintain.
+
+Kapture makes three sounds and no others: a tick on each second of the countdown, a snap with the flash rather than after it, and a chime when the strip appears. None of them is a file. The waveforms are arithmetic in the engine, seeded so the same cue is the same bytes on every machine, which means they cost nothing to ship and can be tested rather than merely listened to. The run driver announces the moment; what it sounds like, and whether anything is heard at all, is decided elsewhere.
+
+Kiosk mode takes the window fullscreen and takes everything out of it: no inspector, no buttons, no title bar. What is left is the picture, the countdown, and one dim line naming the two keys. Space shoots and Escape stops whatever is currently happening. It is fullscreen rather than a locked-down presentation mode on purpose, because the setting that stops a guest wandering off is the same setting that strands whoever is running the party.
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
@@ -100,11 +107,13 @@ Working:
 - Templates as shareable files: save a strip's layout, and import one back after it is checked, or by double-clicking it in Finder
 - A template editor: shot count, columns, paper and chrome, with a live wireframe of the layout
 - Grid layouts alongside vertical stacks, including a 2x2 on a 4x6 print
+- Fullscreen kiosk mode: keyboard only, no chrome, one key in and one key out
+- Countdown, shutter and finish sounds, synthesized rather than shipped
 
 Planned:
 
 - A gallery of past strips, re-editable
-- Fullscreen kiosk mode
+- Auto-restart between runs, so a queue keeps moving
 - Background replacement using Vision person segmentation
 
 ## License

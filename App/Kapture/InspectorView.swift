@@ -97,6 +97,10 @@ struct InspectorView: View {
                     in: 0...5,
                     step: 0.5
                 )
+                // Here rather than in a menu because this section is what a
+                // run does, and because kiosk mode is configured before it is
+                // entered, exactly like the template.
+                Toggle("Sound", isOn: sound)
             }
         }
         .formStyle(.grouped)
@@ -142,6 +146,13 @@ struct InspectorView: View {
                 recipe.style = style.isEmpty ? nil : style
             }
         }
+    }
+
+    private var sound: Binding<Bool> {
+        Binding(
+            get: { !model.sounds.isMuted },
+            set: { model.sounds.isMuted = !$0 }
+        )
     }
 
     private var filter: Binding<PhotoFilter> {
