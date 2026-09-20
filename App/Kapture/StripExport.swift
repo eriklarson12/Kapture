@@ -69,7 +69,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let scale = try renderer.template(for: strip.recipe).scale(forDPI: StripExport.dpi)
             let recipe = strip.recipe
             let data = try await Task.detached(priority: .userInitiated) {
@@ -96,7 +96,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let recipe = strip.recipe
             let data = try await Task.detached(priority: .userInitiated) {
                 let frames = try renderer.renderFrames(recipe, height: StripExport.gifHeight)
@@ -122,7 +122,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let recipe = strip.recipe
             let frames = try await Task.detached(priority: .userInitiated) {
                 try renderer.renderFrames(recipe, height: StripExport.movieHeight)
@@ -152,7 +152,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let recipe = strip.recipe
             let data = try await Task.detached(priority: .userInitiated) {
                 try renderer.renderPDF(recipe, photoDPI: StripExport.pdfPhotoDPI)
@@ -174,7 +174,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let recipe = strip.recipe
             let scale = try renderer.template(for: recipe).scale(forDPI: StripExport.dpi)
             let flavours = try await Task.detached(priority: .userInitiated) {
@@ -203,7 +203,7 @@ extension BoothModel {
         isExporting = true
         defer { isExporting = false }
         do {
-            let renderer = RecipeRenderer(store: store)
+            let renderer = self.renderer
             let recipe = strip.recipe
             let layout = SheetLayout()
             let resolved = try await Task.detached(priority: .userInitiated) {

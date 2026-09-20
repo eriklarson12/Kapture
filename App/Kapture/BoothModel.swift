@@ -24,7 +24,13 @@ enum CameraStatus: Equatable {
 final class BoothModel {
     let camera = AVFoundationCamera()
     let store: StripStore
+    let templateStore: TemplateStore
     let runner: CaptureRunner
+
+    /// The user's imported templates, in name order. Held rather than read on
+    /// demand, because every preview render asks for a template and reading
+    /// files to answer would be absurd.
+    private(set) var userTemplates: [StripTemplate] = []
 
     private(set) var cameraStatus: CameraStatus = .starting
     private(set) var strip: RenderedStrip?
@@ -37,6 +43,10 @@ final class BoothModel {
     /// for a moment. Nothing else would.
     var didCopy = false
     var errorMessage: String?
+    /// A one-line report of something that worked: a template saved, imported
+    /// or removed. Separate from `errorMessage`, which is titled as a failure
+    /// and would be the wrong frame for "Added a template".
+    var notice: String?
 
     /// Guards against an out-of-order render. Dragging a colour emits a stream
     /// of edits, and a slow render landing after a fast one would show a strip
@@ -54,17 +64,37 @@ final class BoothModel {
         didSet { runner.sequence = sequence }
     }
 
+    /// The built-ins plus the user's, which is the one lookup every render
+    /// path takes. A strip shot with an imported template renders only
+    /// because this is what reaches `RecipeRenderer` (ADR-014).
+    var templates: [String: StripTemplate] {
+        TemplateStore.catalogue(with: userTemplates)
+    }
+
+    /// Built-ins first, in their own order, then the user's by name. The
+    /// shipped three stay where they have always been in the picker.
+    var allTemplates: [StripTemplate] {
+        BuiltInTemplates.all + userTemplates
+    }
+
+    /// The one renderer the app builds. Every export path used to construct
+    /// its own with the built-ins only, which is the bug an imported template
+    /// would have found on the next launch.
+    var renderer: RecipeRenderer {
+        RecipeRenderer(store: store, templates: templates)
+    }
+
     /// Templates are addressed by id so the picker selects one rather than
     /// editing the selected one's identity.
     var template: StripTemplate {
-        BuiltInTemplates.template(id: templateID) ?? BuiltInTemplates.classicStrip
+        templates[templateID] ?? BuiltInTemplates.classicStrip
     }
 
     /// The template as the shown strip actually renders it: the base template
     /// with this strip's overrides applied. The inspector displays these values,
     /// so an untouched control shows what the template gives rather than blank.
     var shownTemplate: StripTemplate {
-        let base = BuiltInTemplates.template(id: strip?.recipe.templateID ?? templateID)
+        let base = templates[strip?.recipe.templateID ?? templateID]
             ?? BuiltInTemplates.classicStrip
         return base.applying(strip?.recipe.style)
     }
@@ -72,8 +102,8 @@ final class BoothModel {
     /// A four-frame strip cannot be re-rendered into a three-frame template, so
     /// while one is shown the picker offers only templates that can hold it.
     var availableTemplates: [StripTemplate] {
-        guard let strip else { return BuiltInTemplates.all }
-        return BuiltInTemplates.all.filter { $0.frameCount == strip.recipe.frameIDs.count }
+        guard let strip else { return allTemplates }
+        return allTemplates.filter { $0.frameCount == strip.recipe.frameIDs.count }
     }
 
     var isRunning: Bool {
@@ -89,10 +119,34 @@ final class BoothModel {
     }
 
     init(root: URL = .kaptureSupportDirectory) {
-        let store = StripStore(root: root)
-        self.store = store
+        self.store = StripStore(root: root)
+        self.templateStore = TemplateStore(root: root)
         self.runner = CaptureRunner(camera: camera, sequence: .standard)
+        // A template that cannot be read leaves the built-ins standing. The
+        // app must start.
+        self.userTemplates = (try? templateStore.load()) ?? []
         self.sequence.frameCount = template.frameCount
+    }
+
+    /// Shows a line about something that worked, and takes it away again. A
+    /// report with no dismissal would sit over the viewport until the next one.
+    func report(_ message: String) {
+        notice = message
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            if notice == message { notice = nil }
+        }
+    }
+
+    /// Re-reads the user's templates after one is saved, imported or removed.
+    /// The catalogue is derived from them, so this is the only thing that has
+    /// to be refreshed.
+    func reloadTemplates() {
+        do {
+            userTemplates = try templateStore.load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func startCamera() async {
@@ -224,7 +278,7 @@ final class BoothModel {
     /// Compositing a 600x1800 canvas is not main-thread work, so the render
     /// happens off the actor and only the finished image comes back.
     private func render(_ recipe: StripRecipe, scale: CGFloat) async throws -> CGImage {
-        let renderer = RecipeRenderer(store: store)
+        let renderer = self.renderer
         return try await Task.detached(priority: .userInitiated) {
             try renderer.render(recipe, scale: scale)
         }.value

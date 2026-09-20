@@ -46,6 +46,20 @@ struct StripTemplateTests {
         #expect(template.footerRect().maxY <= lowest.minY)
     }
 
+    @Test("deriving a template keeps the layout and changes only the identity")
+    func derived() {
+        let base = BuiltInTemplates.wideStrip
+        let copy = base.derived(name: "Cream Wide")
+        #expect(copy.name == "Cream Wide")
+        #expect(copy.id != base.id)
+        #expect(copy.derived(name: "Cream Wide").id != copy.id)
+
+        var renamed = copy
+        renamed.id = base.id
+        renamed.name = base.name
+        #expect(renamed == base)
+    }
+
     @Test("rejects a template whose chrome leaves no room")
     func invalidTemplate() {
         let crushed = StripTemplate(

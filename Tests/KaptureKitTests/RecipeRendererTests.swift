@@ -280,6 +280,26 @@ struct RecipeRendererTests {
         }
     }
 
+    /// The reason user templates are kept on disk at all. A strip shot with
+    /// an imported template renders only if the renderer is handed a
+    /// catalogue that holds it; with the built-ins alone it is a strip that
+    /// stopped working at the next launch.
+    @Test("a recipe naming a user template renders through the catalogue")
+    func rendersThroughCatalogue() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip.derived(name: "Imported")
+            let recipe = try store.save(frames: asymmetricFrames(4), templateID: template.id)
+
+            let strip = try RecipeRenderer(store: store, templates: [template.id: template])
+                .render(recipe)
+            #expect(strip.width == Int(template.canvasSize.width))
+
+            #expect(throws: RecipeRenderError.unknownTemplate(template.id)) {
+                try RecipeRenderer(store: store).render(recipe)
+            }
+        }
+    }
+
     @Test("resolving applies the strip's own overrides to the template")
     func resolveAppliesStyle() throws {
         try withStore { store in

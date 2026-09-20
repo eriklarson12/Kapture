@@ -27,12 +27,13 @@ KaptureKit/          engine: models, layout math, renderer, storage
   Capture/           CameraSource protocol, CaptureSequence, CaptureRunner
   Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer
   Export/            MovieRenderer, PDFRenderer, SheetLayout
-  Storage/           StripStore, ImageCodec
-  Templates/         built-in layouts
+  Storage/           StripStore, TemplateStore, ImageCodec
+  Templates/         built-in layouts, and the template file format
 
 App/                 SwiftUI shell
   BoothModel.swift           app state and policy
   StripExport.swift          export, clipboard and print policy
+  TemplateExchange.swift     saving, importing and removing a template
   AVFoundationCamera.swift   the only file that touches a camera
 ```
 
@@ -41,6 +42,8 @@ The engine contains no UI framework. It has no idea a camera or a window exists,
 A strip on disk is a single package directory holding its recipe, its frames, and any picture it uses as a background. Deleting a strip is one filesystem operation, and nothing inside one is ever shared with another.
 
 Styling a strip writes optional overrides onto its recipe rather than editing the template it uses. A value the user never touched keeps following the template, so changing a template still changes every strip that did not override it.
+
+A template is a small JSON file, written with its fields named so it can be edited in a text editor. Saving one takes the strip's current look rather than the layout it started from. Importing one checks it first: a file that would redefine a built-in, or that leaves no room for the photos, is refused with a message saying which. Imported templates are kept alongside the strips, because a strip goes on referring to its template rather than swallowing a copy of it.
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
@@ -89,11 +92,12 @@ Working:
 - PDF export as a real page: the page box measures a true 2x6 inches and the caption is embedded text, not pixels
 - Copy to the clipboard, as a photograph and as something a document can scale
 - Printing, two strips to a 4x6 sheet, at 100% so each one is a true two inches
+- Templates as shareable files: save a strip's layout as JSON, and import one back after it is checked
 
 Planned:
 
 - A gallery of past strips, re-editable
-- User-authored templates as shareable files
+- A template editor, and grid layouts alongside vertical stacks
 - Fullscreen kiosk mode
 - Background replacement using Vision person segmentation
 

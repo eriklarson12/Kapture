@@ -21,7 +21,7 @@ struct ViewportView: View {
         }
         .overlay(alignment: .top) { progress }
         .overlay(alignment: .bottom) { controls }
-        .overlay(alignment: .center) { failure }
+        .overlay(alignment: .center) { message }
         .task { await model.startCamera() }
         .onDisappear { model.stopCamera() }
     }
@@ -109,12 +109,18 @@ struct ViewportView: View {
 
     // MARK: - Chrome
 
+    /// One panel for both channels. A failure wins when both are set, because
+    /// the thing that did not work is the thing that needs reading.
     @ViewBuilder
-    private var failure: some View {
+    private var message: some View {
         if let errorMessage = model.errorMessage {
             notice(title: "Something went wrong", detail: errorMessage)
                 .background(.black.opacity(0.75))
                 .onTapGesture { model.errorMessage = nil }
+        } else if let text = model.notice {
+            notice(title: "Done", detail: text)
+                .background(.black.opacity(0.75))
+                .onTapGesture { model.notice = nil }
         }
     }
 

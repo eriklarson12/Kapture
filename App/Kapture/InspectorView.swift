@@ -13,12 +13,15 @@ struct InspectorView: View {
     var body: some View {
         Form {
             Section("Layout") {
-                Picker("Template", selection: templateSelection) {
-                    ForEach(model.availableTemplates) { option in
-                        Text(option.name).tag(option.id)
+                HStack(spacing: 6) {
+                    Picker("Template", selection: templateSelection) {
+                        ForEach(model.availableTemplates) { option in
+                            Text(option.name).tag(option.id)
+                        }
                     }
+                    templateActions
                 }
-                if model.availableTemplates.count < BuiltInTemplates.all.count {
+                if model.availableTemplates.count < model.allTemplates.count {
                     Text("Only templates that hold \(shotCount) photos can show this strip.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -99,6 +102,25 @@ struct InspectorView: View {
         .formStyle(.grouped)
         .monospacedDigit()
         .disabled(model.isRunning)
+    }
+
+    /// Import, save and remove, next to the list they act on rather than in
+    /// the File menu: this is where someone goes to look at templates.
+    private var templateActions: some View {
+        Menu {
+            Button("Import Template\u{2026}") { Task { await model.importTemplate() } }
+            Button("Save Template\u{2026}") { Task { await model.saveTemplate() } }
+                .disabled(model.strip == nil)
+            Divider()
+            Button("Remove Template") { Task { await model.removeTemplate() } }
+                .disabled(!model.canRemoveTemplate)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Template actions")
     }
 
     // MARK: - Bindings
