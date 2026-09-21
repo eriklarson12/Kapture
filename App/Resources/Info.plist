@@ -12,6 +12,8 @@
 	<string>14.0</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Kapture uses your camera to take the photos that make up a strip.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Kapture serves the strip on screen to phones on this Wi-Fi, so a guest can scan a code and keep their photos.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>UTExportedTypeDeclarations</key>

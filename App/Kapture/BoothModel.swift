@@ -28,6 +28,10 @@ final class BoothModel {
     let store: StripStore
     let templateStore: TemplateStore
     let runner: CaptureRunner
+    /// The hold between two strips in a queue. Lives here rather than in a
+    /// view because the key handling, the hint line and the inspector all read
+    /// it.
+    let restart = RestartTimer()
 
     /// The user's imported templates, in name order. Held rather than read on
     /// demand, because every preview render asks for a template and reading
@@ -54,12 +58,47 @@ final class BoothModel {
     /// Fullscreen, no inspector, no buttons: the app pointed at a party rather
     /// than at the person configuring it. Lives here because the View menu,
     /// the layout and the key handling all read it.
-    var isKiosk = false
+    ///
+    /// Leaving takes the queue with it. A booth that kept restarting behind an
+    /// inspector would discard whatever was being edited in it.
+    var isKiosk = false {
+        didSet { if !isKiosk { stopQueue() } }
+    }
+
+    /// Whether a finished strip starts the next run by itself. Off by default,
+    /// and kiosk-only: anywhere else this is a timer that throws away the strip
+    /// somebody is working on.
+    var autoRestart = false
+
+    /// The caption every new strip is shot with, so a party is captioned once
+    /// rather than once per run. Each strip still stores its own text; this is
+    /// what a new one starts from.
+    var standingCaption = ""
+
+    /// Whether the local server is up. Never on at launch: a booth that starts
+    /// serving photographs to a network nobody asked it to join is not a
+    /// default anyone would choose.
+    ///
+    /// These four are written by `StripSharing.swift` and read everywhere else.
+    var isSharing = false
+    var shareURL: URL?
+    var shareQR: CGImage?
+    /// A server that will not start is text on screen, never a switch that
+    /// silently does nothing.
+    var shareError: String?
+
+    @ObservationIgnored var server: StripServer?
+    @ObservationIgnored var sharePort: UInt16?
+    @ObservationIgnored var shareToken: ShareToken?
+    @ObservationIgnored var sharedRecipe: UUID?
 
     /// Guards against an out-of-order render. Dragging a colour emits a stream
     /// of edits, and a slow render landing after a fast one would show a strip
     /// that no longer matches the recipe.
     @ObservationIgnored private var renderGeneration = 0
+
+    /// The running queue, held so anything can stop it.
+    @ObservationIgnored private var queue: Task<Void, Never>?
 
     /// The template owns the shot count. Letting the sequence carry a second,
     /// independent count is how you get a three-shot run rendered into a
@@ -119,6 +158,11 @@ final class BoothModel {
         case .idle, .finished, .failed: false
         default: true
         }
+    }
+
+    /// True while a finished strip is being held before the next run starts.
+    var isHolding: Bool {
+        restart.secondsRemaining != nil
     }
 
     var canCapture: Bool {
@@ -184,6 +228,45 @@ final class BoothModel {
         }
         guard runner.isComplete else { return }
         await buildStrip()
+    }
+
+    /// Starts a queue: a strip, a hold, the next strip, until somebody stops
+    /// it. Called during a hold it cancels that hold and shoots now, so one key
+    /// still covers both cases.
+    ///
+    /// Without auto-restart this runs exactly once, which is what the shutter
+    /// button has always done.
+    func startQueue() {
+        queue?.cancel()
+        restart.stop()
+        queue = Task { [weak self] in await self?.runQueue() }
+    }
+
+    func stopQueue() {
+        queue?.cancel()
+        queue = nil
+        restart.stop()
+        runner.cancel()
+    }
+
+    private func runQueue() async {
+        repeat {
+            await capture()
+            // A failure ends the queue. Counting down into a camera that has
+            // just failed is a loop that redraws the same error for ever, and
+            // the person who could fix it has been given no gap to do it in.
+            guard isKiosk, autoRestart, strip != nil, errorMessage == nil,
+                  !Task.isCancelled else { return }
+        } while await restart.wait() == .fired
+    }
+
+    /// One field, two effects: it captions the strip on screen and every strip
+    /// shot after it.
+    func setCaption(_ text: String) {
+        standingCaption = text
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard strip != nil else { return }
+        Task { await restyle { $0.caption = trimmed.isEmpty ? nil : text } }
     }
 
     func retake() {
@@ -285,9 +368,18 @@ final class BoothModel {
         isBuilding = true
         defer { isBuilding = false }
         do {
-            let recipe = try store.save(frames: runner.frames, templateID: templateID)
+            let trimmed = standingCaption.trimmingCharacters(in: .whitespacesAndNewlines)
+            let recipe = try store.save(
+                frames: runner.frames,
+                templateID: templateID,
+                caption: trimmed.isEmpty ? nil : standingCaption
+            )
             let image = try await render(recipe, scale: Self.previewScale)
             strip = RenderedStrip(recipe: recipe, image: image)
+            // The previous link is withdrawn here rather than when the run
+            // started, so a guest scanning at the end of a hold keeps the whole
+            // of the next run to finish.
+            share(recipe)
         } catch {
             errorMessage = error.localizedDescription
         }

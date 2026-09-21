@@ -4,9 +4,9 @@ import SwiftUI
 /// Template and sequence controls. Every control here edits a value that lives
 /// in the recipe or the timing plan, never the stored frames.
 ///
-/// Appearance and caption controls need a recipe to edit, so they stay disabled
-/// until the first strip exists. Layout and sequence configure the *next* run
-/// and are live before it.
+/// Appearance and caption *styling* need a recipe to edit, so they stay
+/// disabled until the first strip exists. Layout, sequence and the caption text
+/// configure the *next* run and are live before it.
 struct InspectorView: View {
     @Bindable var model: BoothModel
 
@@ -69,21 +69,26 @@ struct InspectorView: View {
             }
             .disabled(model.strip == nil)
 
+            // The text is live before the first strip and the styling is not:
+            // a caption typed here is carried by every strip shot after it, so
+            // a party is captioned once rather than once a run.
             Section("Caption") {
                 TextField("Caption", text: caption, prompt: Text("None"))
                 Button("Insert date") { insertDate() }
-                Picker("Align", selection: alignment) {
-                    ForEach(CaptionAlignment.allCases, id: \.self) { option in
-                        Text(option.displayName).tag(option)
+                Group {
+                    Picker("Align", selection: alignment) {
+                        ForEach(CaptionAlignment.allCases, id: \.self) { option in
+                            Text(option.displayName).tag(option)
+                        }
                     }
+                    Stepper(
+                        "Size: \(Int(model.shownTemplate.captionFontSize))pt",
+                        value: captionSize,
+                        in: 6...16
+                    )
                 }
-                Stepper(
-                    "Size: \(Int(model.shownTemplate.captionFontSize))pt",
-                    value: captionSize,
-                    in: 6...16
-                )
+                .disabled(model.strip == nil)
             }
-            .disabled(model.strip == nil)
 
             Section("Sequence") {
                 Stepper(
@@ -101,6 +106,40 @@ struct InspectorView: View {
                 // run does, and because kiosk mode is configured before it is
                 // entered, exactly like the template.
                 Toggle("Sound", isOn: sound)
+                Toggle("Auto-restart in kiosk", isOn: $model.autoRestart)
+                Stepper("Hold: \(model.restart.seconds)s", value: hold, in: 5...60, step: 5)
+                    .disabled(!model.autoRestart)
+                Text("A queue runs in kiosk mode only. Anywhere else the timer would throw away the strip you are editing.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Sharing") {
+                Toggle("Share to phones", isOn: sharing)
+                if let url = model.shareURL {
+                    LabeledContent("Link") {
+                        Text(url.absoluteString)
+                            .font(.system(size: 11))
+                            .textSelection(.enabled)
+                    }
+                    if let code = model.shareQR {
+                        // Small here and large in the viewport: this one is for
+                        // the operator checking it works, not for a guest
+                        // across a room.
+                        Image(decorative: code, scale: 1)
+                            .resizable()
+                            .interpolation(.none)
+                            .frame(width: 96, height: 96)
+                    }
+                }
+                if let shareError = model.shareError {
+                    Text(shareError)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Text("The strip on screen is served to anyone on this Wi-Fi holding the link. One strip at a time: a link stops working when the next strip is taken, and every link dies when Kapture quits.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -146,6 +185,24 @@ struct InspectorView: View {
                 recipe.style = style.isEmpty ? nil : style
             }
         }
+    }
+
+    /// The hold is a value on the timer rather than on the model, so it is
+    /// reached by hand rather than through `@Bindable`.
+    private var hold: Binding<Int> {
+        Binding(
+            get: { model.restart.seconds },
+            set: { model.restart.seconds = $0 }
+        )
+    }
+
+    private var sharing: Binding<Bool> {
+        Binding(
+            get: { model.isSharing },
+            set: { wanted in
+                Task { wanted ? await model.startSharing() : model.stopSharing() }
+            }
+        )
     }
 
     private var sound: Binding<Bool> {
@@ -211,22 +268,22 @@ struct InspectorView: View {
         )
     }
 
+    /// The shown strip's own caption when there is one, and the caption the
+    /// next strip will be shot with when there is not.
     private var caption: Binding<String> {
         Binding(
-            get: { model.strip?.recipe.caption ?? "" },
-            set: { text in
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                Task { await model.restyle { $0.caption = trimmed.isEmpty ? nil : text } }
-            }
+            get: { model.strip.map { $0.recipe.caption ?? "" } ?? model.standingCaption },
+            set: { model.setCaption($0) }
         )
     }
 
-    /// Writes the strip's own date into the caption field. It is ordinary text
-    /// from that moment on, so there is one field and one rendering rule.
+    /// Writes the strip's own date into the caption field, or today's when
+    /// there is no strip yet — which is when a party is being set up. It is
+    /// ordinary text from that moment on, so there is one field and one
+    /// rendering rule.
     private func insertDate() {
-        guard let createdAt = model.strip?.recipe.createdAt else { return }
-        let text = Self.dateFormatter.string(from: createdAt)
-        Task { await model.restyle { $0.caption = text } }
+        let date = model.strip?.recipe.createdAt ?? Date()
+        model.setCaption(Self.dateFormatter.string(from: date))
     }
 
     // MARK: - Display

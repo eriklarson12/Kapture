@@ -22,6 +22,7 @@ struct ViewportView: View {
         }
         .overlay(alignment: .top) { progress }
         .overlay(alignment: .bottom) { model.isKiosk ? AnyView(hint) : AnyView(controls) }
+        .overlay(alignment: .bottomTrailing) { shareCode }
         .overlay(alignment: .center) { message }
         .task { await model.startCamera() }
         .onDisappear { model.stopCamera() }
@@ -33,15 +34,17 @@ struct ViewportView: View {
         .onChange(of: model.isKiosk, initial: true) { _, kiosk in hasKeys = kiosk }
         .onKeyPress(.space) {
             guard model.isKiosk, model.canCapture else { return .ignored }
-            Task { await model.capture() }
+            model.startQueue()
             return .handled
         }
         // Escape means "stop the current thing" everywhere else in macOS, so a
         // run in progress is what it stops first. Kiosk is what it stops next.
         .onKeyPress(.escape) {
             guard model.isKiosk else { return .ignored }
-            if model.isRunning {
-                model.runner.cancel()
+            // A run and a hold are both "the current thing". Kiosk is what is
+            // left to stop once neither is happening.
+            if model.isRunning || model.isHolding {
+                model.stopQueue()
             } else {
                 model.isKiosk = false
             }
@@ -161,15 +164,50 @@ struct ViewportView: View {
     /// The only chrome kiosk mode keeps. "Keyboard only" and "no labels" make a
     /// mode nobody can use without being told how, so one dim line names the
     /// keys, and goes away while the run it would interrupt is happening.
+    ///
+    /// During a hold the same line carries the count, because a guest deciding
+    /// whether they have time to do something needs to be told how much.
     @ViewBuilder
     private var hint: some View {
-        if !model.isRunning && !model.isBuilding {
+        if let seconds = model.restart.secondsRemaining {
+            // Brighter and larger than the legend below, because this one is a
+            // deadline rather than a list of keys: it is how long the person
+            // looking at the strip has left with it.
+            Text("Next in \(seconds)s   \u{00B7}   Space to go now   \u{00B7}   Esc to stop")
+                .font(.system(size: 13).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.bottom, 24)
+        } else if !model.isRunning && !model.isBuilding {
             Text(model.strip == nil
                 ? "Space to start   \u{00B7}   Esc to leave"
                 : "Space for another   \u{00B7}   \u{2318}S to save   \u{00B7}   Esc to leave")
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.45))
                 .padding(.bottom, 24)
+        }
+    }
+
+    /// The scannable link, over the strip it points at.
+    ///
+    /// Kiosk only. Outside it the run controls are along this edge and the
+    /// inspector already shows a smaller one; inside it this is the whole
+    /// point of the mode, and it is content rather than chrome.
+    @ViewBuilder
+    private var shareCode: some View {
+        if model.isKiosk, model.isSharing, model.strip != nil,
+           model.retakingFrame == nil, let code = model.shareQR {
+            VStack(spacing: 8) {
+                // Nearest-neighbour: a module blurred into grey is a module a
+                // camera has to guess at.
+                Image(decorative: code, scale: 1)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: 160, height: 160)
+                Text("Scan for your photos")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.65))
+            }
+            .padding(24)
         }
     }
 

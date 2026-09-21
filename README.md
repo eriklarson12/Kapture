@@ -6,7 +6,7 @@ Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Status
 
-The core loop works: press a button, get four photos on a countdown, see the strip, style it, then save it as a 300 dpi PNG, a looping GIF, a movie or a PDF, paste it into another app, or print it. See Roadmap below.
+The core loop works: press a button, get four photos on a countdown, see the strip, style it, then save it as a 300 dpi PNG, a looping GIF, a movie or a PDF, paste it into another app, or print it. It also runs a party: fullscreen with no chrome, a queue that restarts itself, and a QR code a guest scans to take their strip home on their own phone. See Roadmap below.
 
 ## How it works
 
@@ -24,10 +24,11 @@ That one decision buys a lot:
 ```
 KaptureKit/          engine: models, layout math, renderer, storage
   Model/             StripTemplate, StripRecipe, StripStyle, StripBackground, CaptureFrame, RGBA
-  Capture/           CameraSource protocol, CaptureSequence, CaptureCue, CaptureRunner
+  Capture/           CameraSource protocol, CaptureSequence, CaptureCue, CaptureRunner, RestartTimer
   Audio/             SoundCue: the countdown, shutter and finish sounds, as arithmetic
   Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer
   Export/            MovieRenderer, PDFRenderer, SheetLayout
+  Serve/             HTTP as values, the share token and page, the QR code, the listener
   Storage/           StripStore, TemplateStore, ImageCodec
   Templates/         built-in layouts, and the template file format
 
@@ -38,6 +39,7 @@ App/                 SwiftUI shell
   TemplateEditorView.swift   the template editor sheet
   BoothSounds.swift          the cue sink: plays what the engine generated
   KioskMode.swift            fullscreen plumbing for kiosk mode
+  StripSharing.swift         the share link: one strip at a time, over the LAN
   AVFoundationCamera.swift   the only file that touches a camera
 ```
 
@@ -56,6 +58,10 @@ Photos can be stacked down a strip or arranged in a grid. The two are the same l
 Kapture makes three sounds and no others: a tick on each second of the countdown, a snap with the flash rather than after it, and a chime when the strip appears. None of them is a file. The waveforms are arithmetic in the engine, seeded so the same cue is the same bytes on every machine, which means they cost nothing to ship and can be tested rather than merely listened to. The run driver announces the moment; what it sounds like, and whether anything is heard at all, is decided elsewhere.
 
 Kiosk mode takes the window fullscreen and takes everything out of it: no inspector, no buttons, no title bar. What is left is the picture, the countdown, and one dim line naming the two keys. Space shoots and Escape stops whatever is currently happening. It is fullscreen rather than a locked-down presentation mode on purpose, because the setting that stops a guest wandering off is the same setting that strands whoever is running the party.
+
+A booth left to run a party restarts itself. When a strip is finished it is held for a set number of seconds with the count on screen, and then the next run begins; a key press goes early or stops the queue. It only happens in kiosk mode, where there is nothing to interrupt — anywhere else the timer would be throwing away the strip somebody is editing. A camera failure ends the queue rather than restarting into it, because a booth that retries a broken camera never gives anyone a gap to fix it in.
+
+The strip on screen can be handed to a phone. Kapture serves it over the local network and shows a QR code next to the picture; scanning it opens a page with the 300 dpi strip and the looping GIF. One strip is shared at a time, behind an unguessable code, so a link photographed two minutes ago stops working rather than quietly showing whoever is in front of the camera now. Nothing is written down: every link dies when the app quits. The server is a few hundred lines in the engine — request parsing, routing and the page are ordinary values with ordinary tests, and only the socket is left over.
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
@@ -109,11 +115,12 @@ Working:
 - Grid layouts alongside vertical stacks, including a 2x2 on a 4x6 print
 - Fullscreen kiosk mode: keyboard only, no chrome, one key in and one key out
 - Countdown, shutter and finish sounds, synthesized rather than shipped
+- Auto-restart between runs, so a queue keeps moving without anyone at the keyboard
+- A captured strip served to a phone on the same Wi-Fi, by QR code, one strip at a time
 
 Planned:
 
 - A gallery of past strips, re-editable
-- Auto-restart between runs, so a queue keeps moving
 - Background replacement using Vision person segmentation
 
 ## License
