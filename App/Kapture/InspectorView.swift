@@ -51,6 +51,10 @@ struct InspectorView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+                Toggle("Centre on faces", isOn: faceFraming)
+                Text("The crop slides toward the faces it finds. A photo with none is centred.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                 Toggle("Mirror output", isOn: mirrorOutput)
                 Text("The preview and the review beat are always mirrored. This is whether the strip is too.")
                     .font(.system(size: 11))
@@ -240,6 +244,15 @@ struct InspectorView: View {
         Binding(
             get: { model.strip?.recipe.backdrop != nil },
             set: { on in Task { await model.setBackdrop(on ? .solid(.ink) : nil) } }
+        )
+    }
+
+    /// A strip shot before 7.2 has no value and reads as off, which is what it
+    /// renders as.
+    private var faceFraming: Binding<Bool> {
+        Binding(
+            get: { model.strip?.recipe.faceFraming == true },
+            set: { on in Task { await model.setFaceFraming(on) } }
         )
     }
 

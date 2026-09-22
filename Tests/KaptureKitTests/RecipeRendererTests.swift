@@ -543,4 +543,135 @@ struct RecipeRendererTests {
             #expect(resolved.frames[0].height == 480)
         }
     }
+
+    // MARK: - Face framing
+
+    /// 16:9 frames with a red stripe down the leftmost tenth. The classic
+    /// strip's photo rect is narrower, so a centred crop loses the stripe and
+    /// a crop slid to the left keeps it.
+    private func stripedFrames(_ count: Int) -> [CaptureFrame] {
+        (0..<count).map { CaptureFrame(index: $0, image: TestImage.edgeMarked()) }
+    }
+
+    private func faces(at x: CGFloat?) -> FaceStore {
+        FaceStore(detect: { _ in x.map { CGPoint(x: $0, y: 0.5) } })
+    }
+
+    private var photoLeft: Int {
+        Int(BuiltInTemplates.classicStrip.photoRects()[0].minX) + 4
+    }
+
+    private var photoRight: Int {
+        Int(BuiltInTemplates.classicStrip.photoRects()[0].maxX) - 4
+    }
+
+    /// The regression guard for every strip already on disk: they have no
+    /// `faceFraming` key, and Vision must never be asked about them.
+    @Test("framing off renders exactly what it rendered before")
+    func framingOffIsIdentity() throws {
+        try withStore { store in
+            let recipe = try store.save(
+                frames: stripedFrames(4), templateID: BuiltInTemplates.classicStrip.id
+            )
+            let bare = try RecipeRenderer(store: store).render(recipe)
+            let asked = try RecipeRenderer(
+                store: store,
+                faces: FaceStore(detect: { _ in
+                    Issue.record("a recipe without face framing must never reach detection")
+                    return nil
+                })
+            ).render(recipe)
+            #expect(TestImage.pixels(bare) == TestImage.pixels(asked))
+        }
+    }
+
+    @Test("framing on with no faces found renders the centred strip")
+    func noFacesIsCentred() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: stripedFrames(4), templateID: BuiltInTemplates.classicStrip.id
+            )
+            let centred = try RecipeRenderer(store: store).render(recipe)
+            recipe.faceFraming = true
+            let framed = try RecipeRenderer(store: store, faces: faces(at: nil)).render(recipe)
+            #expect(TestImage.pixels(centred) == TestImage.pixels(framed))
+        }
+    }
+
+    @Test("framing on slides the crop toward the faces")
+    func slidesTowardFaces() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: stripedFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
+            )
+            let centred = try RecipeRenderer(store: store, faces: faces(at: 0)).render(recipe)
+            #expect(sample(centred, x: photoLeft) < 32)
+
+            recipe.faceFraming = true
+            let framed = try RecipeRenderer(store: store, faces: faces(at: 0)).render(recipe)
+            #expect(sample(framed, x: photoLeft) > 223)
+            #expect(TestImage.green(framed, x: photoLeft, y: framed.height / 2) < 32)
+        }
+    }
+
+    /// The test that fails if only the paper is wired. A GIF framed differently
+    /// from the strip it came from is the drift `renderFrames` exists to stop.
+    @Test("the framed crop reaches the animation frames the same way it reaches the paper")
+    func renderFramesFraming() throws {
+        try withStore { store in
+            let recipe = try store.save(
+                frames: stripedFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false,
+                faceFraming: true
+            )
+            let frames = try RecipeRenderer(store: store, faces: faces(at: 0))
+                .renderFrames(recipe, height: 400)
+            #expect(TestImage.red(frames[0], x: 2, y: frames[0].height / 2) > 223)
+            let aspect = CGFloat(frames[0].width) / CGFloat(frames[0].height)
+            #expect(abs(aspect - BuiltInTemplates.classicStrip.photoAspect) < 0.01)
+        }
+    }
+
+    /// Faces are found on the true-optics frame and the flip comes after, so a
+    /// mirrored strip keeps the same subject in the same crop, turned round.
+    @Test("a mirrored strip keeps the framed subject, turned round")
+    func mirroredKeepsTheFraming() throws {
+        try withStore { store in
+            let recipe = try store.save(
+                frames: stripedFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: true,
+                faceFraming: true
+            )
+            let strip = try RecipeRenderer(store: store, faces: faces(at: 0)).render(recipe)
+            // Red is the stripe; white also carries full red, so green tells
+            // the two apart.
+            #expect(sample(strip, x: photoRight) > 223)
+            #expect(TestImage.green(strip, x: photoRight, y: strip.height / 2) < 32)
+            #expect(TestImage.green(strip, x: photoLeft, y: strip.height / 2) > 223)
+        }
+    }
+
+    @Test("framing composes with a backdrop")
+    func framingWithBackdrop() throws {
+        try withStore { store in
+            let recipe = try store.save(
+                frames: stripedFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false,
+                backdrop: .solid(RGBA(red: 0, green: 0, blue: 1)),
+                faceFraming: true
+            )
+            let strip = try RecipeRenderer(
+                store: store, masks: halfMasks(), faces: faces(at: 0)
+            ).render(recipe)
+            // The stripe is in the person half, so it survives; the right of
+            // the crop is behind them and is painted.
+            #expect(sample(strip, x: photoLeft) > 223)
+            #expect(blue(strip, x: photoRight) > 223)
+        }
+    }
 }

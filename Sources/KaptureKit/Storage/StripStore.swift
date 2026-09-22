@@ -56,7 +56,8 @@ public struct StripStore: Sendable {
         caption: String? = nil,
         style: StripStyle? = nil,
         mirrorOutput: Bool = true,
-        backdrop: StripBackground? = nil
+        backdrop: StripBackground? = nil,
+        faceFraming: Bool? = nil
     ) throws -> StripRecipe {
         let ordered = frames.sorted { $0.index < $1.index }
         let recipe = StripRecipe(
@@ -66,7 +67,8 @@ public struct StripStore: Sendable {
             caption: caption,
             style: style,
             mirrorOutput: mirrorOutput,
-            backdrop: backdrop
+            backdrop: backdrop,
+            faceFraming: faceFraming
         )
 
         let manager = FileManager.default

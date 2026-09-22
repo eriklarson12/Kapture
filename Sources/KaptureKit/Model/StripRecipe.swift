@@ -30,6 +30,10 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
     /// "follow the template", and a template can neither carry a picture
     /// (ADR-012) nor say anything about what is behind a subject.
     public var backdrop: StripBackground?
+    /// Whether the crop slides toward the faces in each photo rather than
+    /// centring. Optional so packages written before it still decode, and nil
+    /// is off: a strip already on disk keeps the crop it was printed with.
+    public var faceFraming: Bool?
 
     public init(
         id: UUID = UUID(),
@@ -40,7 +44,8 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         caption: String? = nil,
         style: StripStyle? = nil,
         mirrorOutput: Bool = true,
-        backdrop: StripBackground? = nil
+        backdrop: StripBackground? = nil,
+        faceFraming: Bool? = nil
     ) {
         self.id = id
         self.createdAt = Self.storable(createdAt)
@@ -51,6 +56,7 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         self.style = style
         self.mirrorOutput = mirrorOutput
         self.backdrop = backdrop
+        self.faceFraming = faceFraming
     }
 
     /// Normalizes a timestamp to the value its own serialized form decodes to.

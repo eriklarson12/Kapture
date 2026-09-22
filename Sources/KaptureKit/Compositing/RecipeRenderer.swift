@@ -17,15 +17,18 @@ public struct RecipeRenderer: Sendable {
     private let store: StripStore
     private let templates: [String: StripTemplate]
     private let masks: PersonMaskStore
+    private let faces: FaceStore
 
     public init(
         store: StripStore,
         templates: [String: StripTemplate] = BuiltInTemplates.byID,
-        masks: PersonMaskStore = PersonMaskStore()
+        masks: PersonMaskStore = PersonMaskStore(),
+        faces: FaceStore = FaceStore()
     ) {
         self.store = store
         self.templates = templates
         self.masks = masks
+        self.faces = faces
     }
 
     public func template(for recipe: StripRecipe) throws -> StripTemplate {
@@ -46,7 +49,7 @@ public struct RecipeRenderer: Sendable {
     /// leaves the frames alone, which is what an on-screen render wants.
     public func resolve(_ recipe: StripRecipe, photoDPI: CGFloat? = nil) throws -> ResolvedStrip {
         let template = try template(for: recipe).applying(recipe.style)
-        var frames = try photographs(for: recipe)
+        var frames = try photographs(for: recipe, photoAspect: template.photoAspect)
         if let photoDPI {
             let scale = template.scale(forDPI: photoDPI)
             let cover = CGSize(
@@ -93,13 +96,13 @@ public struct RecipeRenderer: Sendable {
     public func renderFrames(_ recipe: StripRecipe, height: CGFloat) throws -> [CGImage] {
         let template = try template(for: recipe).applying(recipe.style)
         let size = Self.evenSize(height: height, aspect: template.photoAspect)
-        return try photographs(for: recipe).map { frame in
+        return try photographs(for: recipe, photoAspect: template.photoAspect).map { frame in
             try StripRenderer.photo(frame, size: size, mirrored: recipe.mirrorOutput)
         }
     }
 
     /// Every stored frame as the strip shows it: the backdrop replaced, then
-    /// the filter, in that order.
+    /// the filter, then the crop toward the faces, in that order.
     ///
     /// Both render paths call this, so an animation cannot be composited or
     /// filtered differently from the paper it came from.
@@ -111,8 +114,24 @@ public struct RecipeRenderer: Sendable {
     /// remembered by frame id. The mask therefore comes off the stored frame,
     /// which is also true optics — `mirrorOutput` flips the finished composite
     /// later, so the backdrop turns with the person it is behind.
-    private func photographs(for recipe: StripRecipe) throws -> [CGImage] {
+    ///
+    /// The crop comes last, and its faces are found on the stored frame for the
+    /// same reason the mask is. Last also means a strip with framing off never
+    /// reaches it, so its pixels are exactly what they were before 7.2.
+    private func photographs(
+        for recipe: StripRecipe, photoAspect: CGFloat
+    ) throws -> [CGImage] {
         let images = try store.loadFrames(for: recipe)
+        let composited = try composited(images, for: recipe)
+        guard recipe.faceFraming == true else { return composited }
+        return zip(recipe.frameIDs, zip(images, composited)).map { frameID, pair in
+            let (stored, shown) = pair
+            guard let focus = faces.focus(for: stored, id: frameID) else { return shown }
+            return FaceFramer.cropped(shown, aspect: photoAspect, focus: focus)
+        }
+    }
+
+    private func composited(_ images: [CGImage], for recipe: StripRecipe) throws -> [CGImage] {
         func filtered(_ image: CGImage) -> CGImage {
             FilterRenderer.apply(recipe.filter, to: image)
         }

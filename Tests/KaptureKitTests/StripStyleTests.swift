@@ -72,6 +72,7 @@ struct StripStyleTests {
         #expect(recipe.style == nil)
         // The same fixture is the guard for every later optional field.
         #expect(recipe.backdrop == nil)
+        #expect(recipe.faceFraming == nil)
         #expect(recipe.templateID == "classic-strip")
     }
 

@@ -49,6 +49,21 @@ struct StripRecipeTests {
         }
     }
 
+    @Test("face framing survives a recipe round trip")
+    func faceFramingRoundTrips() throws {
+        for value in [true, false] {
+            let recipe = StripRecipe(
+                templateID: BuiltInTemplates.classicStrip.id,
+                frameIDs: [UUID()],
+                faceFraming: value
+            )
+            let data = try RecipeCoding.encoder().encode(recipe)
+            let decoded = try RecipeCoding.decoder().decode(StripRecipe.self, from: data)
+            #expect(decoded.faceFraming == value)
+            #expect(decoded == recipe)
+        }
+    }
+
     @Test("normalizing is idempotent")
     func storableIsIdempotent() {
         for _ in 0..<200 {

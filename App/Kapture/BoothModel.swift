@@ -85,6 +85,11 @@ final class BoothModel {
     var standingBackdrop: StripBackground?
     @ObservationIgnored var standingBackdropImage: CGImage?
 
+    /// Whether each new strip crops toward the faces in it. On for strips shot
+    /// from now; a strip already on disk has no such key and stays centred
+    /// (ADR-025). Standing, like the backdrop.
+    var standingFaceFraming = true
+
     /// Whether the local server is up. Never on at launch: a booth that starts
     /// serving photographs to a network nobody asked it to join is not a
     /// default anyone would choose.
@@ -138,13 +143,15 @@ final class BoothModel {
     /// its own with the built-ins only, which is the bug an imported template
     /// would have found on the next launch.
     var renderer: RecipeRenderer {
-        RecipeRenderer(store: store, templates: templates, masks: masks)
+        RecipeRenderer(store: store, templates: templates, masks: masks, faces: faces)
     }
 
     /// One set of person masks for the whole app. Every export path already
     /// goes through `renderer`, so the preview, the PNG, the GIF, the movie,
     /// the PDF and the print job all share it and a frame is segmented once.
     @ObservationIgnored private let masks = PersonMaskStore()
+    /// Faces found once per frame, for the same reason.
+    @ObservationIgnored private let faces = FaceStore()
 
     /// Templates are addressed by id so the picker selects one rather than
     /// editing the selected one's identity.
@@ -295,6 +302,13 @@ final class BoothModel {
         await restyle { $0.backdrop = backdrop }
     }
 
+    /// Standing, like the backdrop: the strip on screen and every one after it.
+    func setFaceFraming(_ on: Bool) async {
+        standingFaceFraming = on
+        guard strip != nil else { return }
+        await restyle { $0.faceFraming = on }
+    }
+
     /// Copies a picture into the strip's own package and paints it behind the
     /// person (ADR-012).
     ///
@@ -429,7 +443,8 @@ final class BoothModel {
                 // A picture is attached afterwards, once there is a package to
                 // copy it into. Writing the standing id here would name an
                 // asset belonging to the strip it was chosen on.
-                backdrop: standingBackdropImage == nil ? standingBackdrop : nil
+                backdrop: standingBackdropImage == nil ? standingBackdrop : nil,
+                faceFraming: standingFaceFraming
             )
             recipe = try carryBackdropPicture(onto: recipe)
             let image = try await render(recipe, scale: Self.previewScale)
