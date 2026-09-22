@@ -1,12 +1,12 @@
 # Kapture
 
-A macOS photobooth. Take a sequence of photos with your camera and get a classic photo strip.
+Take a sequence of photos with your camera and get a classic photo strip on macOS.
 
 Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Features
 
-- **Capture:** live mirrored preview, countdown, flash, and sounds. Retake a single shot without redoing the run.
+- **Capture:** live mirrored preview, countdown, flash, and sounds. Each photo is cropped to centre on the faces in it. Retake a single shot without redoing the run.
 - **Templates:** vertical strips and grid layouts. Build your own in the template editor, then save and share it as a file.
 - **Styling:** paper, ink, border, and corner styles. Add solid, gradient, or picture backgrounds, filters, and captions.
 - **Background replacement:** finds the person in each photo and puts a colour, gradient, or picture behind them.
@@ -35,7 +35,7 @@ Requirements:
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
 ```sh
-git clone https://github.com/eriklarson/Kapture.git
+git clone https://github.com/eriklarson12/Kapture.git
 cd Kapture
 
 brew install xcodegen
