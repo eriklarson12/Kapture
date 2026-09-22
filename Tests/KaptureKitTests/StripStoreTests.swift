@@ -258,6 +258,26 @@ struct StripStoreTests {
         }
     }
 
+    /// A strip can want a picture on its paper and a different one behind the
+    /// person. Two assets, one package, neither shared with anything.
+    @Test("a strip holds a paper picture and a backdrop picture at once")
+    func twoAssetsInOnePackage() throws {
+        try withStore { store in
+            let saved = try store.save(frames: makeFrames(), templateID: "classic-strip")
+            let paper = TestImage.solid(width: 16, height: 16, gray: 0.9)
+            let backdrop = TestImage.asymmetric(width: 16, height: 16)
+
+            let paperID = try store.saveAsset(paper, in: saved.id)
+            let backdropID = try store.saveAsset(backdrop, in: saved.id)
+
+            #expect(paperID != backdropID)
+            #expect(TestImage.pixels(try store.loadAsset(paperID, in: saved.id))
+                == TestImage.pixels(paper))
+            #expect(TestImage.pixels(try store.loadAsset(backdropID, in: saved.id))
+                == TestImage.pixels(backdrop))
+        }
+    }
+
     /// Assets live inside the strip, so deleting the strip takes them with it.
     /// That is the whole of ADR-012: nothing is shared, nothing is counted.
     @Test("deleting a strip takes its assets with it")

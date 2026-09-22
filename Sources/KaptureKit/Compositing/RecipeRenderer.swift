@@ -9,16 +9,23 @@ public enum RecipeRenderError: Error, Equatable {
 /// frames, composite. This is the payoff for ADR-003 — nothing was baked, so a
 /// strip can be re-rendered at any size, with any template, forever.
 ///
-/// Per-strip overrides in `recipe.style` are resolved here, and the recorded
-/// filter is applied here, so `StripRenderer` keeps taking finished frames and
-/// a finished template and stays pure geometry.
+/// Per-strip overrides in `recipe.style` are resolved here, the recorded
+/// backdrop is composited here and the recorded filter is applied here, so
+/// `StripRenderer` keeps taking finished frames and a finished template and
+/// stays pure geometry.
 public struct RecipeRenderer: Sendable {
     private let store: StripStore
     private let templates: [String: StripTemplate]
+    private let masks: PersonMaskStore
 
-    public init(store: StripStore, templates: [String: StripTemplate] = BuiltInTemplates.byID) {
+    public init(
+        store: StripStore,
+        templates: [String: StripTemplate] = BuiltInTemplates.byID,
+        masks: PersonMaskStore = PersonMaskStore()
+    ) {
         self.store = store
         self.templates = templates
+        self.masks = masks
     }
 
     public func template(for recipe: StripRecipe) throws -> StripTemplate {
@@ -39,9 +46,7 @@ public struct RecipeRenderer: Sendable {
     /// leaves the frames alone, which is what an on-screen render wants.
     public func resolve(_ recipe: StripRecipe, photoDPI: CGFloat? = nil) throws -> ResolvedStrip {
         let template = try template(for: recipe).applying(recipe.style)
-        var frames = try store.loadFrames(for: recipe).map {
-            FilterRenderer.apply(recipe.filter, to: $0)
-        }
+        var frames = try photographs(for: recipe)
         if let photoDPI {
             let scale = template.scale(forDPI: photoDPI)
             let cover = CGSize(
@@ -88,13 +93,71 @@ public struct RecipeRenderer: Sendable {
     public func renderFrames(_ recipe: StripRecipe, height: CGFloat) throws -> [CGImage] {
         let template = try template(for: recipe).applying(recipe.style)
         let size = Self.evenSize(height: height, aspect: template.photoAspect)
-        return try store.loadFrames(for: recipe).map { frame in
-            try StripRenderer.photo(
-                FilterRenderer.apply(recipe.filter, to: frame),
-                size: size,
-                mirrored: recipe.mirrorOutput
-            )
+        return try photographs(for: recipe).map { frame in
+            try StripRenderer.photo(frame, size: size, mirrored: recipe.mirrorOutput)
         }
+    }
+
+    /// Every stored frame as the strip shows it: the backdrop replaced, then
+    /// the filter, in that order.
+    ///
+    /// Both render paths call this, so an animation cannot be composited or
+    /// filtered differently from the paper it came from.
+    ///
+    /// The order is not a preference. A filter run first would leave the new
+    /// backdrop in full colour behind a monochrome subject and would leave it
+    /// free of grain, which is the tell of a cut-out; and a mask taken off a
+    /// filtered frame would be a function of the filter, so it could not be
+    /// remembered by frame id. The mask therefore comes off the stored frame,
+    /// which is also true optics — `mirrorOutput` flips the finished composite
+    /// later, so the backdrop turns with the person it is behind.
+    private func photographs(for recipe: StripRecipe) throws -> [CGImage] {
+        let images = try store.loadFrames(for: recipe)
+        func filtered(_ image: CGImage) -> CGImage {
+            FilterRenderer.apply(recipe.filter, to: image)
+        }
+
+        guard let background = recipe.backdrop else { return images.map(filtered) }
+
+        var asset: CGImage?
+        if case .image(let assetID) = background {
+            // A backdrop picture that has gone leaves the photograph, unlike a
+            // missing paper picture, which refuses the strip. The paper is the
+            // strip; a backdrop is a change of mind about one part of it.
+            guard let loaded = try? store.loadAsset(assetID, in: recipe.id) else {
+                return images.map(filtered)
+            }
+            asset = loaded
+        }
+
+        // Painted once per distinct frame size rather than once per frame.
+        // Keyed by a pair of ints because `CGSize` is `Hashable` only from
+        // macOS 15 and this target is 14.
+        var rasters: [Pixels: CGImage] = [:]
+
+        return zip(recipe.frameIDs, images).map { frameID, image in
+            guard let mask = masks.mask(for: image, id: frameID) else { return filtered(image) }
+            let size = Pixels(width: image.width, height: image.height)
+            let raster: CGImage
+            if let painted = rasters[size] {
+                raster = painted
+            } else if let painted = try? StripRenderer.backdrop(
+                background,
+                size: CGSize(width: image.width, height: image.height),
+                image: asset
+            ) {
+                rasters[size] = painted
+                raster = painted
+            } else {
+                return filtered(image)
+            }
+            return filtered(BackdropRenderer.composite(image, over: raster, mask: mask))
+        }
+    }
+
+    private struct Pixels: Hashable {
+        let width: Int
+        let height: Int
     }
 
     /// `height` by `height * aspect`, both rounded to even numbers. H.264

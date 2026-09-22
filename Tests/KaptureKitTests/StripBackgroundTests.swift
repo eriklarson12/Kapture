@@ -133,6 +133,41 @@ struct StripBackgroundTests {
         }
     }
 
+    @Test("a backdrop is painted by the same fill the paper is")
+    func paintsBackdrop() throws {
+        let size = CGSize(width: 100, height: 100)
+        let raster = try StripRenderer.backdrop(
+            .linearGradient(
+                from: RGBA(red: 0, green: 0, blue: 0),
+                to: RGBA(red: 1, green: 1, blue: 1),
+                angle: 0
+            ),
+            size: size,
+            image: nil
+        )
+
+        #expect(raster.width == 100)
+        #expect(raster.height == 100)
+        #expect(TestImage.red(raster, x: 4, y: 50) < TestImage.red(raster, x: 95, y: 50))
+        // Flat across the axis, within the dither the paper's gradient allows.
+        let across = abs(
+            Int(TestImage.red(raster, x: 4, y: 20)) - Int(TestImage.red(raster, x: 4, y: 80))
+        )
+        #expect(across <= 2)
+    }
+
+    @Test("a backdrop picture covers the whole frame")
+    func paintsBackdropPicture() throws {
+        let raster = try StripRenderer.backdrop(
+            .image(id: UUID()),
+            size: CGSize(width: 64, height: 48),
+            image: TestImage.solid(width: 8, height: 8, gray: 1)
+        )
+        for (x, y) in [(0, 0), (63, 0), (0, 47), (63, 47)] {
+            #expect(TestImage.red(raster, x: x, y: y) == 255, "corner \(x),\(y)")
+        }
+    }
+
     /// Consistent with a missing frame, which already makes a strip refuse to
     /// render rather than render something quietly wrong.
     @Test("an image background with no image names the asset it wanted")

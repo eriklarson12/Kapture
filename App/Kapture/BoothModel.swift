@@ -75,6 +75,16 @@ final class BoothModel {
     /// what a new one starts from.
     var standingCaption = ""
 
+    /// What goes behind the person on every strip shot after it, so a party is
+    /// set up once rather than once per run — the same rule as the caption.
+    ///
+    /// A picture is held as well as named, because an asset id belongs to one
+    /// strip's package (ADR-012). Carrying the id alone would give the next
+    /// strip a recipe naming a file that is not there; the image is what gets
+    /// copied into each new package instead.
+    var standingBackdrop: StripBackground?
+    @ObservationIgnored var standingBackdropImage: CGImage?
+
     /// Whether the local server is up. Never on at launch: a booth that starts
     /// serving photographs to a network nobody asked it to join is not a
     /// default anyone would choose.
@@ -128,8 +138,13 @@ final class BoothModel {
     /// its own with the built-ins only, which is the bug an imported template
     /// would have found on the next launch.
     var renderer: RecipeRenderer {
-        RecipeRenderer(store: store, templates: templates)
+        RecipeRenderer(store: store, templates: templates, masks: masks)
     }
+
+    /// One set of person masks for the whole app. Every export path already
+    /// goes through `renderer`, so the preview, the PNG, the GIF, the movie,
+    /// the PDF and the print job all share it and a frame is segmented once.
+    @ObservationIgnored private let masks = PersonMaskStore()
 
     /// Templates are addressed by id so the picker selects one rather than
     /// editing the selected one's identity.
@@ -269,6 +284,44 @@ final class BoothModel {
         Task { await restyle { $0.caption = trimmed.isEmpty ? nil : text } }
     }
 
+    /// One field, two effects, like the caption: it changes the strip on screen
+    /// and every strip shot after it.
+    func setBackdrop(_ backdrop: StripBackground?) async {
+        standingBackdrop = backdrop
+        // Dropped whenever the backdrop stops being a picture, so the held
+        // image and the recorded one cannot describe different things.
+        if case .image = backdrop {} else { standingBackdropImage = nil }
+        guard strip != nil else { return }
+        await restyle { $0.backdrop = backdrop }
+    }
+
+    /// Copies a picture into the strip's own package and paints it behind the
+    /// person (ADR-012).
+    ///
+    /// Fitted to the photo band rather than to the canvas, which is what
+    /// `setBackgroundImage` does: a backdrop is composited inside one
+    /// photograph, not painted across the paper.
+    func setBackdropImage(_ image: CGImage) async {
+        guard let current = strip else { return }
+        do {
+            let fitted = StripRenderer.downscaled(image, covering: photoPixelSize)
+            let assetID = try store.saveAsset(fitted, in: current.recipe.id)
+            standingBackdrop = .image(id: assetID)
+            standingBackdropImage = fitted
+            await restyle { $0.backdrop = .image(id: assetID) }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// The pixels one photograph occupies on a 300 dpi print. The same size
+    /// `RecipeRenderer` shrinks a frame to for a PDF.
+    private var photoPixelSize: CGSize {
+        let template = shownTemplate
+        let scale = template.scale(forDPI: 300)
+        return CGSize(width: template.photoWidth * scale, height: template.photoHeight * scale)
+    }
+
     func retake() {
         strip = nil
         retakingFrame = nil
@@ -369,11 +422,16 @@ final class BoothModel {
         defer { isBuilding = false }
         do {
             let trimmed = standingCaption.trimmingCharacters(in: .whitespacesAndNewlines)
-            let recipe = try store.save(
+            var recipe = try store.save(
                 frames: runner.frames,
                 templateID: templateID,
-                caption: trimmed.isEmpty ? nil : standingCaption
+                caption: trimmed.isEmpty ? nil : standingCaption,
+                // A picture is attached afterwards, once there is a package to
+                // copy it into. Writing the standing id here would name an
+                // asset belonging to the strip it was chosen on.
+                backdrop: standingBackdropImage == nil ? standingBackdrop : nil
             )
+            recipe = try carryBackdropPicture(onto: recipe)
             let image = try await render(recipe, scale: Self.previewScale)
             strip = RenderedStrip(recipe: recipe, image: image)
             // The previous link is withdrawn here rather than when the run
@@ -383,6 +441,26 @@ final class BoothModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Copies the standing picture into this strip's own package and repoints
+    /// the recipe at the copy.
+    ///
+    /// The id the standing backdrop carries names an asset inside the strip it
+    /// was chosen on. Written into a second strip it would name a file that is
+    /// not there, so every strip gets its own copy and stays a folder that can
+    /// be handed to someone (ADR-011, ADR-012).
+    ///
+    /// The asset is written before the recipe that names it, which is the order
+    /// `StripStore.replaceFrame` already keeps.
+    private func carryBackdropPicture(onto recipe: StripRecipe) throws -> StripRecipe {
+        guard case .image = standingBackdrop, let picture = standingBackdropImage else {
+            return recipe
+        }
+        var copied = recipe
+        copied.backdrop = .image(id: try store.saveAsset(picture, in: recipe.id))
+        try store.update(copied)
+        return copied
     }
 
     /// Compositing a 600x1800 canvas is not main-thread work, so the render

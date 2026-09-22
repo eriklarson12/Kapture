@@ -87,7 +87,7 @@ public struct StripRenderer {
         defer { context.restoreGState() }
 
         context.interpolationQuality = .high
-        try fill(
+        try Self.paint(
             template.background,
             in: CGRect(origin: .zero, size: template.canvasSize),
             image: backgroundImage,
@@ -142,7 +142,11 @@ public struct StripRenderer {
     /// Paints the canvas behind the photos. An image arrives already loaded,
     /// because `StripRenderer` does no I/O; `RecipeRenderer` resolves the asset
     /// the same way it resolves the frames.
-    private func fill(
+    /// Fills `bounds` with a background. Static and shared rather than private
+    /// to `draw`, because a backdrop behind a person is painted from the same
+    /// three cases and a second painter would eventually disagree with this one
+    /// about what 45 degrees means.
+    static func paint(
         _ background: StripBackground, in bounds: CGRect,
         image: CGImage?, context: CGContext
     ) throws {
@@ -193,6 +197,42 @@ public struct StripRenderer {
             CGPoint(x: centre.x - direction.dx * reach, y: centre.y - direction.dy * reach),
             CGPoint(x: centre.x + direction.dx * reach, y: centre.y + direction.dy * reach)
         )
+    }
+
+    /// A background as a standalone raster at `pixelSize`, painted by the same
+    /// fill the paper is.
+    ///
+    /// This is what a person is composited over. It is here rather than in
+    /// `BackdropRenderer` so that there is one painter: a gradient behind a
+    /// subject and a gradient behind the photos read the same angle.
+    public static func backdrop(
+        _ background: StripBackground, size pixelSize: CGSize, image: CGImage?
+    ) throws -> CGImage {
+        guard pixelSize.width >= 1, pixelSize.height >= 1,
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: nil,
+                  width: Int(pixelSize.width),
+                  height: Int(pixelSize.height),
+                  bitsPerComponent: 8,
+                  bytesPerRow: 0,
+                  space: colorSpace,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else {
+            throw StripRenderError.contextCreationFailed
+        }
+        context.interpolationQuality = .high
+        try paint(
+            background,
+            in: CGRect(origin: .zero, size: pixelSize),
+            image: image,
+            context: context
+        )
+        guard let output = context.makeImage() else {
+            throw StripRenderError.contextCreationFailed
+        }
+        return output
     }
 
     /// `image` shrunk to the smallest size that still covers `pixelSize` when

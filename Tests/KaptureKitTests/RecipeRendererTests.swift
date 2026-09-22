@@ -106,6 +106,183 @@ struct RecipeRendererTests {
         return (Int(pixels[offset]), Int(pixels[offset + 2]))
     }
 
+    // MARK: - Backdrop
+
+    /// A stub segmenter, so every backdrop test asserts the compositing rather
+    /// than what Vision decided. The left half of each frame is the person,
+    /// which is also the black half of `TestImage.asymmetric()`.
+    private func halfMasks() -> PersonMaskStore {
+        PersonMaskStore(segment: { TestImage.mask(width: $0.width, height: $0.height) })
+    }
+
+    private func redAsset() -> CGImage {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let context = CGContext(
+            data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+            space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        return context.makeImage()!
+    }
+
+    @Test("a recorded backdrop reaches the rendered strip")
+    func appliesStoredBackdrop() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            var recipe = try store.save(
+                frames: asymmetricFrames(4), templateID: template.id, mirrorOutput: false
+            )
+            let renderer = RecipeRenderer(store: store, masks: halfMasks())
+            let left = 20
+            let right = Int(template.canvasSize.width) - 20
+
+            // Without a backdrop the right half of each photo is the white the
+            // camera saw.
+            let plain = try renderer.render(recipe)
+            #expect(sample(plain, x: left) < 32)
+            #expect(sample(plain, x: right) > 223)
+
+            recipe.backdrop = .solid(RGBA(red: 0, green: 0, blue: 1))
+            let replaced = try renderer.render(recipe)
+            // The person half is untouched; everything else is the backdrop.
+            #expect(sample(replaced, x: left) < 32)
+            #expect(sample(replaced, x: right) < 32)
+            #expect(blue(replaced, x: right) > 223)
+        }
+    }
+
+    private func blue(_ strip: CGImage, x: Int) -> UInt8 {
+        let pixels = TestImage.pixels(strip)
+        let offset = (strip.height / 2) * strip.width * 4 + x * 4 + 2
+        return pixels[offset]
+    }
+
+    /// The test that fails if only one of the two render paths is wired. A GIF
+    /// composited differently from the paper is the drift this project has
+    /// already been bitten by once.
+    @Test("the backdrop reaches the animation frames the same way it reaches the paper")
+    func renderFramesBackdrop() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
+            )
+            recipe.backdrop = .solid(RGBA(red: 0, green: 0, blue: 1))
+
+            let frames = try RecipeRenderer(store: store, masks: halfMasks())
+                .renderFrames(recipe, height: 400)
+            let row = frames[0].height / 2
+            let right = frames[0].width - 4
+
+            #expect(TestImage.red(frames[0], x: 4, y: row) < 32)
+            #expect(TestImage.red(frames[0], x: right, y: row) < 32)
+            #expect(TestImage.green(frames[0], x: right, y: row) < 32)
+        }
+    }
+
+    /// One look has to cover the whole photograph. A filter run first would
+    /// leave the new backdrop in full colour behind a monochrome subject.
+    @Test("the backdrop is composited before the filter, so one look covers the whole photograph")
+    func compositesBeforeFiltering() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
+            )
+            recipe.backdrop = .solid(RGBA(red: 0, green: 0, blue: 1))
+            recipe.filter = .blackAndWhite
+
+            let strip = try RecipeRenderer(store: store, masks: halfMasks()).render(recipe)
+            let right = Int(BuiltInTemplates.classicStrip.canvasSize.width) - 20
+            // Grey, not blue: the filter reached the backdrop too.
+            let red = Int(sample(strip, x: right))
+            let blueChannel = Int(blue(strip, x: right))
+            #expect(abs(red - blueChannel) <= 2)
+        }
+    }
+
+    /// Deliberately unlike a missing *paper* picture, which refuses the strip.
+    /// The paper is the strip; a backdrop is a change of mind about one part of
+    /// it, and losing it must not lose the photographs.
+    @Test("a backdrop naming a missing asset does not lose the strip")
+    func missingBackdropAssetStillRenders() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
+            )
+            recipe.backdrop = .image(id: UUID())
+
+            let strip = try RecipeRenderer(store: store, masks: halfMasks()).render(recipe)
+            #expect(sample(strip, x: 20) < 32)
+            #expect(sample(strip, x: Int(BuiltInTemplates.classicStrip.canvasSize.width) - 20) > 223)
+        }
+    }
+
+    @Test("a backdrop picture is loaded from the strip's own package")
+    func backdropPictureComesFromThePackage() throws {
+        try withStore { store in
+            var recipe = try store.save(
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id,
+                mirrorOutput: false
+            )
+            let assetID = try store.saveAsset(redAsset(), in: recipe.id)
+            recipe.backdrop = .image(id: assetID)
+
+            let strip = try RecipeRenderer(store: store, masks: halfMasks()).render(recipe)
+            let right = Int(BuiltInTemplates.classicStrip.canvasSize.width) - 20
+            #expect(sample(strip, x: right) > 223)
+            #expect(blue(strip, x: right) < 32)
+        }
+    }
+
+    /// The mask comes off the stored frame, which is true optics, and the flip
+    /// happens to the finished composite. So the backdrop turns with the person
+    /// it is behind rather than staying put while they move.
+    @Test("a mirrored strip mirrors the backdrop with the person")
+    func mirrorsBackdropWithThePerson() throws {
+        try withStore { store in
+            let template = BuiltInTemplates.classicStrip
+            var recipe = try store.save(
+                frames: asymmetricFrames(4), templateID: template.id, mirrorOutput: true
+            )
+            recipe.backdrop = .solid(RGBA(red: 0, green: 0, blue: 1))
+
+            let strip = try RecipeRenderer(store: store, masks: halfMasks()).render(recipe)
+            let left = 20
+            let right = Int(template.canvasSize.width) - 20
+            // The person was on the left and is now on the right.
+            #expect(blue(strip, x: left) > 223)
+            #expect(blue(strip, x: right) < 32)
+        }
+    }
+
+    /// The regression guard for every strip already on disk. No backdrop means
+    /// the pixels do not move at all, and Vision is never asked anything.
+    @Test("no backdrop renders exactly what it rendered before")
+    func noBackdropIsIdentity() throws {
+        try withStore { store in
+            let recipe = try store.save(
+                frames: asymmetricFrames(4),
+                templateID: BuiltInTemplates.classicStrip.id
+            )
+            let bare = try RecipeRenderer(store: store).render(recipe)
+            let withMasks = try RecipeRenderer(
+                store: store,
+                masks: PersonMaskStore(segment: { _ in
+                    Issue.record("a recipe with no backdrop must never reach segmentation")
+                    return nil
+                })
+            ).render(recipe)
+            #expect(TestImage.pixels(bare) == TestImage.pixels(withMasks))
+        }
+    }
+
     @Test("an unknown template id names itself")
     func unknownTemplate() throws {
         try withStore { store in

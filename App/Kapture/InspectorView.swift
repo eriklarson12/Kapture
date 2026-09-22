@@ -36,6 +36,21 @@ struct InspectorView: View {
                         Text(option.displayName).tag(option)
                     }
                 }
+                Toggle("Replace background", isOn: backdropEnabled)
+                if let backdrop = model.strip?.recipe.backdrop {
+                    BackgroundControls(
+                        title: "Backdrop",
+                        solidLabel: "Colour",
+                        background: backdrop,
+                        onChange: { value in Task { await model.setBackdrop(value) } },
+                        onChooseImage: { image in
+                            Task { await model.setBackdropImage(image) }
+                        }
+                    )
+                    Text("The person is found and everything behind them is painted over. A photo with nobody in it is left alone.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
                 Toggle("Mirror output", isOn: mirrorOutput)
                 Text("The preview and the review beat are always mirrored. This is whether the strip is too.")
                     .font(.system(size: 11))
@@ -216,6 +231,15 @@ struct InspectorView: View {
         Binding(
             get: { model.strip?.recipe.filter ?? .none },
             set: { value in Task { await model.restyle { $0.filter = value } } }
+        )
+    }
+
+    /// Seeded with ink rather than paper: the first thing the user sees must be
+    /// that something happened, and a white backdrop on white paper is not it.
+    private var backdropEnabled: Binding<Bool> {
+        Binding(
+            get: { model.strip?.recipe.backdrop != nil },
+            set: { on in Task { await model.setBackdrop(on ? .solid(.ink) : nil) } }
         )
     }
 

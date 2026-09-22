@@ -29,6 +29,26 @@ struct StripRecipeTests {
         }
     }
 
+    @Test("a backdrop survives a recipe round trip")
+    func backdropRoundTrips() throws {
+        let backdrops: [StripBackground] = [
+            .solid(.ink),
+            .linearGradient(from: .paper, to: .ink, angle: 45),
+            .image(id: UUID())
+        ]
+        for backdrop in backdrops {
+            let recipe = StripRecipe(
+                templateID: BuiltInTemplates.classicStrip.id,
+                frameIDs: [UUID()],
+                backdrop: backdrop
+            )
+            let data = try RecipeCoding.encoder().encode(recipe)
+            let decoded = try RecipeCoding.decoder().decode(StripRecipe.self, from: data)
+            #expect(decoded.backdrop == backdrop)
+            #expect(decoded == recipe)
+        }
+    }
+
     @Test("normalizing is idempotent")
     func storableIsIdempotent() {
         for _ in 0..<200 {

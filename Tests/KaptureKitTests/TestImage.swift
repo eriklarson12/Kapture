@@ -44,6 +44,31 @@ enum TestImage {
         return context.makeImage()!
     }
 
+    /// A device-grey mask: `personFraction` of the width white on the left,
+    /// the rest black. Grey rather than sRGB because that is the shape
+    /// `BackdropRenderer` produces and `CIBlendWithMask` reads.
+    static func mask(
+        width: Int = 640, height: Int = 480, personFraction: Double = 0.5
+    ) -> CGImage {
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        )!
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let person = Int((Double(width) * personFraction).rounded())
+        if person > 0 {
+            context.setFillColor(gray: 1, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: person, height: height))
+        }
+        return context.makeImage()!
+    }
+
     /// A red stripe down the leftmost tenth, then black to the midpoint, then
     /// white. Aspect-filling a wide source into a squarer box crops the stripe
     /// away; squashing the whole width in would keep it. The stripe is what

@@ -23,6 +23,13 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
     /// out the other way round would contradict what they just watched. The
     /// stored frame is always true optics; this is the only thing that flips it.
     public var mirrorOutput: Bool
+    /// What to paint behind the person, when Vision can find one. Nil is the
+    /// common case: the photograph keeps the room it was shot in.
+    ///
+    /// It lives here rather than on `StripStyle` because `nil` there means
+    /// "follow the template", and a template can neither carry a picture
+    /// (ADR-012) nor say anything about what is behind a subject.
+    public var backdrop: StripBackground?
 
     public init(
         id: UUID = UUID(),
@@ -32,7 +39,8 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         filter: PhotoFilter = .none,
         caption: String? = nil,
         style: StripStyle? = nil,
-        mirrorOutput: Bool = true
+        mirrorOutput: Bool = true,
+        backdrop: StripBackground? = nil
     ) {
         self.id = id
         self.createdAt = Self.storable(createdAt)
@@ -42,6 +50,7 @@ public struct StripRecipe: Codable, Equatable, Identifiable, Sendable {
         self.caption = caption
         self.style = style
         self.mirrorOutput = mirrorOutput
+        self.backdrop = backdrop
     }
 
     /// Normalizes a timestamp to the value its own serialized form decodes to.

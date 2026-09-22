@@ -6,7 +6,7 @@ Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Status
 
-The core loop works: press a button, get four photos on a countdown, see the strip, style it, then save it as a 300 dpi PNG, a looping GIF, a movie or a PDF, paste it into another app, or print it. It also runs a party: fullscreen with no chrome, a queue that restarts itself, and a QR code a guest scans to take their strip home on their own phone. See Roadmap below.
+The core loop works: press a button, get four photos on a countdown, see the strip, style it, then save it as a 300 dpi PNG, a looping GIF, a movie or a PDF, paste it into another app, or print it. It also runs a party: fullscreen with no chrome, a queue that restarts itself, a backdrop painted in behind the subject, and a QR code a guest scans to take their strip home on their own phone. See Roadmap below.
 
 ## How it works
 
@@ -26,7 +26,7 @@ KaptureKit/          engine: models, layout math, renderer, storage
   Model/             StripTemplate, StripRecipe, StripStyle, StripBackground, CaptureFrame, RGBA
   Capture/           CameraSource protocol, CaptureSequence, CaptureCue, CaptureRunner, RestartTimer
   Audio/             SoundCue: the countdown, shutter and finish sounds, as arithmetic
-  Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer
+  Compositing/       StripRenderer, RecipeRenderer, ResolvedStrip, CaptionRenderer, FilterRenderer, BackdropRenderer, PersonMaskStore
   Export/            MovieRenderer, PDFRenderer, SheetLayout
   Serve/             HTTP as values, the share token and page, the QR code, the listener
   Storage/           StripStore, TemplateStore, ImageCodec
@@ -62,6 +62,8 @@ Kiosk mode takes the window fullscreen and takes everything out of it: no inspec
 A booth left to run a party restarts itself. When a strip is finished it is held for a set number of seconds with the count on screen, and then the next run begins; a key press goes early or stops the queue. It only happens in kiosk mode, where there is nothing to interrupt — anywhere else the timer would be throwing away the strip somebody is editing. A camera failure ends the queue rather than restarting into it, because a booth that retries a broken camera never gives anyone a gap to fix it in.
 
 The strip on screen can be handed to a phone. Kapture serves it over the local network and shows a QR code next to the picture; scanning it opens a page with the 300 dpi strip and the looping GIF. One strip is shared at a time, behind an unguessable code, so a link photographed two minutes ago stops working rather than quietly showing whoever is in front of the camera now. Nothing is written down: every link dies when the app quits. The server is a few hundred lines in the engine — request parsing, routing and the page are ordinary values with ordinary tests, and only the socket is left over.
+
+The background behind a person can be replaced. Vision finds the subject in each stored photograph and everything behind them is painted over with a colour, a gradient or a picture — the same three choices the paper already offered, painted by the same code, so a gradient behind a person and a gradient behind the photos read the same angle. Nothing is baked: the mask is taken at render time from the photograph as the camera recorded it, which is why the backdrop can be changed or dropped a year later, why it turns with the subject when the strip is mirrored, and why the filter lands on the finished composite rather than on the person alone. A photograph with nobody in it is left alone rather than replaced entirely, because a model that finds nothing says so by returning an empty mask, and painting that would hand somebody four rectangles of colour instead of their strip.
 
 The live preview is letterboxed to the shape each photo is cropped to, so what you compose against is what the strip keeps. The saved photo records what the lens saw, and the strip mirrors it back by default, so the result matches the person you watched on screen.
 
@@ -117,11 +119,12 @@ Working:
 - Countdown, shutter and finish sounds, synthesized rather than shipped
 - Auto-restart between runs, so a queue keeps moving without anyone at the keyboard
 - A captured strip served to a phone on the same Wi-Fi, by QR code, one strip at a time
+- Background replacement: Vision finds the person, and a colour, gradient or picture goes behind them
 
 Planned:
 
 - A gallery of past strips, re-editable
-- Background replacement using Vision person segmentation
+- Face detection to centre the crop on the subject
 
 ## License
 

@@ -10,13 +10,19 @@ import UniformTypeIdentifiers
 /// Its own file because it is the one control in the inspector with more than
 /// one shape, and because picking a file is a side effect the rest of the form
 /// does not have.
+///
+/// The labels are parameters because the Photos section asks the same three
+/// questions about what goes behind a person. One control, two callers, rather
+/// than a fork that drifts.
 struct BackgroundControls: View {
+    var title = "Background"
+    var solidLabel = "Paper"
     let background: StripBackground
     let onChange: (StripBackground) -> Void
     let onChooseImage: (CGImage) -> Void
 
     var body: some View {
-        Picker("Background", selection: kind) {
+        Picker(title, selection: kind) {
             ForEach(BackgroundKind.allCases, id: \.self) { option in
                 Text(option.displayName).tag(option)
             }
@@ -24,7 +30,7 @@ struct BackgroundControls: View {
 
         switch background {
         case .solid:
-            ColorPicker("Paper", selection: solidColor, supportsOpacity: false)
+            ColorPicker(solidLabel, selection: solidColor, supportsOpacity: false)
 
         case .linearGradient(_, _, let angle):
             ColorPicker("From", selection: gradientStart, supportsOpacity: false)

@@ -14,11 +14,15 @@ enum FilterRenderer {
     /// Shared rather than built per call, because a colour drag emits a
     /// continuous stream of renders and each context costs real milliseconds.
     /// `CIContext` is `Sendable`, so this needs no unsafe annotation.
-    private static let context = CIContext(
+    ///
+    /// Internal rather than private because `BackdropRenderer` is the second
+    /// reader. Two contexts in one process is the cost this one exists to
+    /// avoid.
+    static let context = CIContext(
         options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB) as Any]
     )
 
-    private static let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB)
+    static let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB)
 
     static func apply(_ filter: PhotoFilter, to image: CGImage) -> CGImage {
         // Returned before CoreImage is touched at all, so an unfiltered strip
