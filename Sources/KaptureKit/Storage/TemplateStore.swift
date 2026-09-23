@@ -16,13 +16,8 @@ public enum TemplateInstall: Equatable {
 /// <root>/Templates/<template-id>.json
 /// ```
 ///
-/// A template is referenced by a recipe, never copied into it, which is what
-/// keeps a template edit able to move every strip that used it. The cost is
-/// that a template file is load-bearing: delete one and the strips naming it
-/// stop rendering.
-///
-/// `root` is injected the same way `StripStore`'s is: the app passes
-/// Application Support, tests pass a temporary directory.
+/// Referenced by a recipe, never copied — a template edit moves every strip
+/// that used it, but deleting the file stops those strips rendering.
 public struct TemplateStore: Sendable {
     public let root: URL
 
@@ -38,11 +33,8 @@ public struct TemplateStore: Sendable {
         templatesURL.appending(path: "\(id).json")
     }
 
-    /// Every user template, by name. A file that fails to decode or to
-    /// validate is skipped rather than fatal — one bad template must not hide
-    /// the rest, which is the rule `listRecipes()` already applies to packages.
-    ///
-    /// A root with no `Templates/` directory is a fresh install, not an error.
+    /// Every user template, by name. A file that fails to decode or validate
+    /// is skipped rather than fatal; a missing `Templates/` dir means a fresh install.
     public func load() throws -> [StripTemplate] {
         let manager = FileManager.default
         guard let contents = try? manager.contentsOfDirectory(
@@ -56,9 +48,7 @@ public struct TemplateStore: Sendable {
                 guard let data = try? Data(contentsOf: url) else { return nil }
                 return try? TemplateImport.decode(data)
             }
-            // Ties break on id so the order is total; two templates may
-            // genuinely share a name, and an arbitrary order for equal keys is
-            // a flake waiting for a fast machine.
+            // Ties break on id so the order is total; two templates may genuinely share a name.
             .sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
     }
 
@@ -86,13 +76,8 @@ public struct TemplateStore: Sendable {
         try FileManager.default.removeItem(at: url)
     }
 
-    /// The built-ins plus these, in one dictionary. This is the lookup
-    /// `RecipeRenderer` takes; there is no second path, and a user template
-    /// cannot shadow a built-in because `TemplateImport` refuses a built-in id.
-    ///
-    /// Static, so a caller holding the templates it already loaded merges them
-    /// the same way rather than writing the rule a second time. The app holds
-    /// them: reading four files to render a preview would be absurd.
+    /// The built-ins plus these, in one dictionary — the only lookup
+    /// `RecipeRenderer` uses. Static, so a caller already holding loaded templates merges the same way.
     public static func catalogue(with userTemplates: [StripTemplate]) -> [String: StripTemplate] {
         var merged = BuiltInTemplates.byID
         for template in userTemplates { merged[template.id] = template }

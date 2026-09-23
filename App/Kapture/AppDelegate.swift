@@ -1,10 +1,8 @@
 import AppKit
 import Observation
 
-/// Files LaunchServices has handed the app, waiting for a window to take them.
-///
-/// A double-click on a template can arrive before any scene exists, so they
-/// queue here rather than being dropped.
+/// Files LaunchServices handed the app before any scene existed to take them.
+/// A double-click on a template can arrive before a window does.
 @MainActor
 @Observable
 final class OpenedFiles {

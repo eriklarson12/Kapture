@@ -2,27 +2,15 @@ import CoreGraphics
 import Foundation
 import Vision
 
-/// Finds the faces in a stored frame and slides the crop toward them, instead
-/// of always cropping about the centre.
-///
-/// One of the two files that import Vision (ADR-025). The request is one
-/// function; the arithmetic that turns faces into a crop takes plain values and
-/// is where the tests live.
+/// One of two files that import Vision (ADR-025); the face-to-crop
+/// arithmetic takes plain values, which is where the tests live.
 enum FaceFramer {
-    /// A face shorter than this fraction of the largest one is ignored. A
-    /// poster on the wall or somebody far back in the room must not pull the
-    /// crop away from the people in front of the camera.
+    /// A face shorter than this fraction of the largest one is ignored, so a
+    /// poster on the wall can't pull the crop away from the people in front.
     static let minimumRelativeSize: CGFloat = 0.25
 
-    // MARK: - Detection
-
-    /// Where the faces in `image` are, as a point in 0–1 with a bottom-left
-    /// origin, or nil when Vision found none or failed.
-    ///
-    /// The frame handed in MUST be the stored one: true optics, unfiltered and
-    /// before any backdrop. Then the answer is a function of the frame id, and
-    /// the flip that `mirrorOutput` applies later turns the framed photo about
-    /// its own centre.
+    /// `image` must be the stored, true-optics frame, before any backdrop —
+    /// then the answer is a function of the frame id alone.
     static func focus(for image: CGImage) -> CGPoint? {
         let request = VNDetectFaceRectanglesRequest()
         // Pinned rather than left to `defaultRevision`, which moves with the
@@ -41,11 +29,8 @@ enum FaceFramer {
         return focus(of: (request.results ?? []).map(\.boundingBox))
     }
 
-    /// The centre of the union of the faces worth framing, in the space the
-    /// faces are given in.
-    ///
-    /// The union rather than the largest face, so two people at opposite
-    /// edges are both kept, or at least centred between when they cannot be.
+    /// Union rather than the largest face, so two people at opposite edges
+    /// are both kept, or centred between when they can't both fit.
     static func focus(of faces: [CGRect]) -> CGPoint? {
         guard let tallest = faces.map(\.height).max(), tallest > 0 else { return nil }
         let kept = faces.filter { $0.height >= tallest * minimumRelativeSize }
@@ -54,14 +39,8 @@ enum FaceFramer {
         return CGPoint(x: union.midX, y: union.midY)
     }
 
-    // MARK: - Geometry
-
-    /// The largest rect of `aspect` inside an image of `size`, centred on
-    /// `focus` as far as the edges allow. Bottom-left origin, whole pixels.
-    ///
-    /// Only the long axis moves. With `focus` at the centre this is the region
-    /// `StripRenderer.aspectFillRect` shows, so a frame with no faces and a
-    /// frame whose faces are centred crop the same way.
+    /// Bottom-left origin, whole pixels. With `focus` centred this matches
+    /// `StripRenderer.aspectFillRect`, so a faceless frame crops the same way.
     static func cropRect(imageSize size: CGSize, aspect: CGFloat, focus: CGPoint) -> CGRect {
         guard size.width >= 1, size.height >= 1, aspect > 0 else {
             return CGRect(origin: .zero, size: size)

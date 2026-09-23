@@ -1,15 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The capture flash. This is the one piece of delight in the app and it earns
-/// its place by doubling as fill light for the subject.
-///
 /// A full-screen white flash is a genuine hazard for photosensitive users, so
-/// when Reduce Motion is set this degrades to a border pulse instead. That
-/// check is required by docs/design-system.md, not optional polish.
-///
-/// How long it is held is `CaptureSequence.flashSeconds`: `CaptureRunner` has
-/// to wait on that value, so it lives in the engine rather than here.
+/// when Reduce Motion is set this degrades to a border pulse instead.
 struct FlashOverlay: View {
     let isFlashing: Bool
 

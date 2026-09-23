@@ -32,11 +32,8 @@ struct TemplateImportTests {
         #expect(throws: expected) { try TemplateImport.validate(template) }
     }
 
-    // MARK: - The round trip
-
-    /// What 5.1 writes is exactly what 5.2 has to be able to read back. The
-    /// built-ins go through as derived copies because their own ids are
-    /// reserved.
+    /// What 5.1 writes is exactly what 5.2 has to read back. Built-ins go
+    /// through as derived copies because their own ids are reserved.
     @Test("a template survives the round trip through a file")
     func roundTrip() throws {
         for builtIn in BuiltInTemplates.all {
@@ -80,9 +77,8 @@ struct TemplateImportTests {
         #expect(template.captionAlignment == .center)
     }
 
-    /// The coder is hand-written, so a field added to the struct without a
-    /// line in it would round-trip as its default and no other test would
-    /// notice. This is the one that would.
+    /// The coder is hand-written, so a field added without a line in it would
+    /// round-trip as its default unnoticed. This test is the one that would notice.
     @Test("a template file holds exactly the keys the format names")
     func keysOnFile() throws {
         let data = try TemplateImport.encode(custom())
@@ -91,9 +87,8 @@ struct TemplateImportTests {
         #expect(keys == Set(StripTemplate.CodingKeys.allCases.map(\.rawValue)))
     }
 
-    /// Width and height are named, because `[144, 432]` in a file someone is
-    /// meant to edit is a coin flip, and a transposed canvas renders a 6x2
-    /// strip that reads as a bug in the app.
+    /// Width and height are named because `[144, 432]` in a hand-edited file
+    /// is a coin flip; a transposed canvas reads as a bug in the app.
     @Test("the canvas is written with its sides named")
     func namedCanvas() throws {
         let text = String(decoding: try TemplateImport.encode(custom()), as: UTF8.self)
@@ -150,8 +145,6 @@ struct TemplateImportTests {
         #expect(template.photoRects().count == 4)
     }
 
-    // MARK: - Refusals
-
     @Test("refuses bytes that are not a template")
     func garbage() {
         #expect(throws: TemplateImportError.self) {
@@ -163,8 +156,7 @@ struct TemplateImportTests {
     }
 
     /// Someone hand-editing a template needs the field, not "the data
-    /// couldn't be read because it is missing", which is what the decoder
-    /// says on its own.
+    /// couldn't be read because it is missing," which is the decoder's default.
     @Test("a refusal names the field that went wrong")
     func namesTheField() {
         let missing = """

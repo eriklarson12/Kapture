@@ -1,13 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// The camera, behind a protocol so the engine and its tests never link
-/// AVFoundation. The real conformance lives in the app target; tests use a stub
-/// that returns generated images.
-///
-/// `start()` is async because authorization is a user-facing prompt and because
-/// starting a capture session blocks long enough that it must not run on the
-/// main thread.
+/// The camera, behind a protocol so the engine and its tests never link AVFoundation.
+/// `start()` is async because authorization prompts the user and can block.
 @MainActor
 public protocol CameraSource: AnyObject {
     var isRunning: Bool { get }

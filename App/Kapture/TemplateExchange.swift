@@ -3,24 +3,13 @@ import KaptureKit
 import UniformTypeIdentifiers
 
 extension UTType {
-    /// The template format, declared in the app's Info.plist.
-    ///
-    /// Its own extension rather than a claim on `public.json`: a template is
-    /// still literally JSON and still opens in TextEdit, but Kapture does not
-    /// become the system's handler for every JSON file on the machine
-    /// (ADR-017).
-    ///
-    /// `exportedAs` requires the declaration to be in the bundle and fails
-    /// loudly without it. That is the right failure: a quiet fallback to a
-    /// dynamic type gives a save panel that works and a double-click that does
-    /// not, which is the hardest version of this bug to find.
+    /// Its own extension rather than a claim on `public.json`, or Kapture would
+    /// become the system's handler for every JSON file on the machine (ADR-017).
     static let kaptureTemplate = UTType(
         exportedAs: "com.eriklarson.kapture.template", conformingTo: .json
     )
 }
 
-/// What the editor is opened on.
-///
 /// The count of strips already using the template is taken once, when the
 /// sheet opens, rather than read off disk on every redraw of a slider.
 struct TemplateEdit: Identifiable {
@@ -46,16 +35,8 @@ extension BoothModel {
         userTemplates.contains { $0.id == templateID }
     }
 
-    /// Writes the shown strip's layout out as a template and keeps a copy.
-    ///
-    /// The strip's own overrides are baked in, which is the point: the file is
-    /// what the paper currently looks like, not what the template it started
-    /// from looks like. The strip is not touched — its overrides stay exactly
-    /// where they are, and the new template is a separate thing that merely
-    /// begins life looking the same.
-    ///
-    /// The file is written and the template is installed. Writing a file the
-    /// user then has to import by hand would be a step with no purpose.
+    /// The strip's own overrides are baked in on purpose: the file is what the
+    /// paper currently looks like, not what its template started as.
     func saveTemplate() async {
         guard strip != nil else { return }
         let source = shownTemplate
@@ -83,8 +64,6 @@ extension BoothModel {
         }
     }
 
-    /// Asks for a template file and takes it in.
-    ///
     /// Files written before the format had an extension of its own are still
     /// plain `.json`, so both are offered.
     func importTemplate() async {
@@ -97,15 +76,8 @@ extension BoothModel {
         await importTemplate(at: url)
     }
 
-    /// Takes a template file in, if it survives `TemplateImport.decode`.
-    ///
-    /// A file carrying an id already in the list replaces that template, which
-    /// is what makes a template editable in a text editor. Replacing one
-    /// re-renders every strip that names it, so the count says so rather than
-    /// letting the user find out later.
-    ///
-    /// Split from the panel so a file double-clicked in Finder arrives by the
-    /// same path, through the same validator, with the same report.
+    /// Replaces a template already in the list and re-renders every strip naming
+    /// it. Split from the panel so a Finder double-click arrives the same way.
     func importTemplate(at url: URL) async {
         do {
             let template = try TemplateImport.decode(try Data(contentsOf: url))
@@ -130,11 +102,8 @@ extension BoothModel {
         }
     }
 
-    /// Drops a user template, unless a strip still names it.
-    ///
     /// Nothing reference-counts a template, so this is the check that stands
-    /// between a tidy-up and a strip that cannot render. Same reasoning
-    /// ADR-011 applied to frames, one directory over.
+    /// between a tidy-up and a strip that cannot render (ADR-011).
     func removeTemplate() async {
         guard let template = userTemplates.first(where: { $0.id == templateID }) else { return }
         do {
@@ -156,12 +125,8 @@ extension BoothModel {
         }
     }
 
-    /// Opens the editor on the selected template.
-    ///
-    /// A built-in is duplicated first. A shipped layout is a constant in the
-    /// binary, and redefining `classic-strip` would move every strip ever shot
-    /// with it — which is the same reason `TemplateImport` refuses its id in a
-    /// file.
+    /// A built-in is duplicated first: redefining `classic-strip` would move
+    /// every strip ever shot with it (same reason `TemplateImport` refuses its id).
     func editTemplate() {
         let selected = templates[templateID] ?? BuiltInTemplates.classicStrip
         let isBuiltIn = BuiltInTemplates.byID[selected.id] != nil
@@ -175,11 +140,8 @@ extension BoothModel {
         )
     }
 
-    /// Writes an edited template back under its own id.
-    ///
-    /// A shown strip that names it is re-rendered here. A template edit changes
-    /// what a recipe *means* rather than what it says, so nothing in `restyle`
-    /// would notice and the viewport would sit on a stale image.
+    /// A shown strip naming it is re-rendered here: a template edit changes
+    /// what a recipe *means*, not what it says, so `restyle` wouldn't notice.
     func applyEdit(_ edit: TemplateEdit) async {
         do {
             try templateStore.install(edit.template)
@@ -187,10 +149,8 @@ extension BoothModel {
             let name = "\u{201C}\(edit.template.name)\u{201D}"
 
             if edit.isCopy {
-                // The user asked to edit something. Leaving them on the
-                // built-in would make the whole sheet a silent no-op, so this
-                // is the one place a template action moves the selection — and
-                // only when the shown strip can actually go in it.
+                // Leaving them on the built-in would make the sheet a silent
+                // no-op, so this moves the selection when the strip fits.
                 let fits = strip == nil
                     || edit.template.frameCount == strip?.recipe.frameIDs.count
                 if fits { await selectTemplate(edit.template.id) }
@@ -213,9 +173,8 @@ extension BoothModel {
         }
     }
 
-    /// How many stored strips name this template. A listing that cannot be
-    /// read counts as none: this gates a removal, and refusing to tidy up
-    /// because the directory is unreadable would be the wrong failure.
+    /// A listing that can't be read counts as none: refusing to tidy up because
+    /// the directory is unreadable would be the wrong failure.
     func stripsUsing(_ id: String) -> Int {
         ((try? store.listRecipes()) ?? []).filter { $0.templateID == id }.count
     }

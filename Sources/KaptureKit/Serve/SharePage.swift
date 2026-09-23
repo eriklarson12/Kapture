@@ -1,16 +1,10 @@
 import Foundation
 
-/// The one page a guest sees, built as a pure function of a token and a
-/// caption.
-///
-/// Achromatic like the app: white, grey and black, so the strip is the only
-/// colour on the phone too. No script and no asset — a page that needs a second
-/// request to be readable is a page that fails on a slow party network.
+/// The one page a guest sees, built as a pure function of a token and a caption.
+/// Achromatic like the app, and no script or asset — a second request fails on a slow party network.
 public enum SharePage {
     /// A caption is the first user text in this project that becomes markup.
-    ///
-    /// Ampersand first, or the entities written after it are escaped a second
-    /// time and the page shows `&amp;lt;`.
+    /// Ampersand must be escaped first, or the entities after it double-escape.
     public static func escaped(_ text: String) -> String {
         text
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -38,9 +32,8 @@ public enum SharePage {
         )
     }
 
-    /// What a withdrawn link says. One strip is shared at a time, so this is
-    /// the normal end of every link rather than an error: it must read like an
-    /// explanation and not like a fault.
+    /// What a withdrawn link says. This is the normal end of every link, not
+    /// an error, so it must read like an explanation and not a fault.
     public static func gone() -> String {
         document(
             title: "That strip has gone",

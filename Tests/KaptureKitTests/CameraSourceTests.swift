@@ -2,9 +2,8 @@ import CoreGraphics
 import Testing
 @testable import KaptureKit
 
-/// Stands in for a camera. Its existence is the point: if `CameraSource` ever
-/// stops being implementable without AVFoundation, this file stops compiling
-/// and the engine has quietly grown a hardware dependency.
+/// Stands in for a camera. If `CameraSource` ever stops being implementable
+/// without AVFoundation, this file stops compiling — a canary for that dependency.
 @MainActor
 final class StubCamera: CameraSource {
     private(set) var isRunning = false

@@ -62,8 +62,6 @@ struct SoundCueTests {
         #expect(rms(buffer, from: 0.125, to: 0.145) > rms(buffer, from: 0.100, to: 0.118))
     }
 
-    // MARK: - Container
-
     /// A header whose lengths are short gives a file that exists, has a
     /// plausible size, and that nothing will open.
     @Test("the WAV header names the format and the real lengths")

@@ -1,12 +1,8 @@
 import KaptureKit
 import SwiftUI
 
-/// Edits a template's structure: the shot count, the columns, the paper and
-/// the chrome. These are exactly the fields `StripStyle` deliberately cannot
-/// override, because they change the shape of the paper rather than its look.
-///
-/// It works on a copy. Cancel costs nothing, and Save is the single write,
-/// which is what makes the shot-count lock enforceable in one place.
+/// Edits fields `StripStyle` deliberately cannot override, since they change
+/// the shape of the paper, not its look. Works on a copy; Save is the single write.
 struct TemplateEditorView: View {
     let model: BoothModel
     let edit: TemplateEdit
@@ -107,8 +103,7 @@ struct TemplateEditorView: View {
         .padding(16)
     }
 
-    /// The same gate an import passes, so the editor cannot produce a template
-    /// the importer would refuse. The failure stays in the sheet: dismissing
+    /// The same gate an import passes. Failure stays in the sheet: dismissing
     /// on a refusal would throw the edit away.
     private func save() {
         do {
@@ -121,8 +116,6 @@ struct TemplateEditorView: View {
             failure = error.localizedDescription
         }
     }
-
-    // MARK: - Pieces
 
     private func slider(
         _ label: String, value: Binding<CGFloat>,
@@ -181,9 +174,8 @@ struct TemplateEditorView: View {
         )
     }
 
-    /// The presets, plus whatever this template already is. A hand-written
-    /// file may hold a size no menu offers, and the picker must not silently
-    /// snap it to one that it does.
+    /// Plus whatever this template already is: a hand-written file may hold a
+    /// size no menu offers, and the picker must not silently snap it to one.
     private var papers: [Paper] {
         let presets = [
             Paper(CGSize(width: 144, height: 432)),
@@ -196,10 +188,8 @@ struct TemplateEditorView: View {
     }
 }
 
-/// A canvas size the `Picker` can select.
-///
 /// `CGSize` is only `Hashable` from macOS 15, and the deployment target is 14
-/// (ADR-006), so the two sides are carried separately rather than raising it.
+/// (ADR-006), so the two sides are carried separately for the `Picker`.
 private struct Paper: Hashable, Identifiable {
     var width: CGFloat
     var height: CGFloat
@@ -222,12 +212,8 @@ private struct Paper: Hashable, Identifiable {
     }
 }
 
-/// The layout as the renderer will lay it out, drawn from the very
-/// `photoRects()` the renderer reads.
-///
-/// Not a render: it costs nothing at every tick of a drag, it works before the
-/// first strip exists, and it cannot drift from the output because it is the
-/// same geometry rather than a second copy of it.
+/// Not a render: drawn from the same `photoRects()` the renderer reads, so it
+/// costs nothing on a drag and can't drift from the actual output.
 private struct TemplateWireframe: View {
     let template: StripTemplate
 
@@ -272,9 +258,8 @@ private struct TemplateWireframe: View {
         return min(available.width / canvas.width, available.height / canvas.height)
     }
 
-    /// CoreGraphics counts up from the bottom and a `Canvas` counts down from
-    /// the top, so the rect the renderer uses has to be turned over to be
-    /// drawn here.
+    /// CoreGraphics counts up from the bottom, `Canvas` down from the top, so
+    /// the renderer's rect has to be turned over to draw here.
     private func flipped(_ rect: CGRect, in canvas: CGSize, scale: CGFloat) -> CGRect {
         CGRect(
             x: rect.minX * scale,

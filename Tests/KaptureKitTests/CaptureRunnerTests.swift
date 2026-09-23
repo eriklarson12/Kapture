@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import KaptureKit
 
-/// A clock that never sleeps but records everything it was asked to wait for.
-/// That turns the timing plan into something a test can assert, instead of
-/// something a test can only sit through.
+/// A clock that never sleeps but records everything it was asked to wait for,
+/// so a test can assert the timing plan instead of sitting through it.
 @MainActor
 final class TestClock: CaptureClock {
     private(set) var waits: [Duration] = []
@@ -78,9 +77,8 @@ struct CaptureRunnerTests {
         ])
     }
 
-    /// The last frame gets no review beat, which is the same subtraction
-    /// `CaptureSequence.totalDuration` makes. If the driver and the model ever
-    /// disagree, the progress indicator lies; this is what keeps them in step.
+    /// The last frame gets no review beat, matching the subtraction
+    /// `CaptureSequence.totalDuration` makes — keeps the progress indicator honest.
     @Test("countdown and review time add up to the advertised duration")
     func matchesTotalDuration() async throws {
         let sequence = CaptureSequence(frameCount: 4, countdownSeconds: 3, reviewSeconds: 1)
@@ -143,8 +141,6 @@ struct CaptureRunnerTests {
         #expect(runner.frames.isEmpty)
     }
 
-    // MARK: - Single-frame retake
-
     @Test("a retake shoots one slot and keeps its index")
     func retakeShootsOneSlot() async throws {
         let (runner, camera, _) = try await makeRunner()
@@ -157,9 +153,8 @@ struct CaptureRunnerTests {
         #expect(runner.state == .finished)
     }
 
-    /// `frames` is the record of a whole run and `isComplete` reads it. A
-    /// retake that appended would make a four-shot strip look like a five-shot
-    /// one, which the renderer would refuse.
+    /// `isComplete` reads `frames` as the record of a whole run. A retake that
+    /// appended would make a four-shot strip look like a five-shot one.
     @Test("a retake leaves the run's own frames alone")
     func retakeDoesNotTouchRunFrames() async throws {
         let (runner, _, _) = try await makeRunner()
@@ -193,8 +188,6 @@ struct CaptureRunnerTests {
         #expect(frame == nil)
         #expect(runner.state == .failed(CaptureError.captureFailed("lens cap").localizedDescription))
     }
-
-    // MARK: - Cues
 
     @Test("a run ticks through every countdown, snaps with every flash, and chimes once")
     func cueSchedule() async throws {

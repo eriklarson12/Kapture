@@ -1,16 +1,12 @@
 import CoreGraphics
 import Foundation
 
-/// What fills the canvas behind the photos.
-///
-/// This was a bare `RGBA` until gradients arrived. The decoder below still
-/// accepts that shape, which is what keeps every template and every styled
-/// strip written before this type existed readable.
+/// This was a bare `RGBA` until gradients arrived; the decoder still accepts
+/// that shape, so strips written before this type existed stay readable.
 public enum StripBackground: Equatable, Sendable {
     case solid(RGBA)
-    /// `angle` is in degrees, measured counter-clockwise from left-to-right.
-    /// One convention, stated here and asserted in the tests, because a
-    /// gradient that silently rotates between builds is not re-renderable.
+    /// `angle` is degrees counter-clockwise from left-to-right — asserted in
+    /// tests, since a silently rotating convention isn't re-renderable.
     case linearGradient(from: RGBA, to: RGBA, angle: CGFloat)
     /// An image in the strip's own package (ADR-012), named by asset id.
     case image(id: UUID)
@@ -52,11 +48,8 @@ extension StripBackground: Codable {
         }
     }
 
-    /// Hand-written rather than synthesized for two reasons. The synthesized
-    /// form for an enum with associated values nests everything under `_0`, and
-    /// `recipe.json` is a file people are meant to be able to open. And the
-    /// fallback below is the migration: a document written before this type
-    /// existed holds a bare `RGBA` here, and must still decode.
+    /// Hand-written, not synthesized — synthesis nests an enum's associated
+    /// values under `_0`, and the fallback below still decodes a bare `RGBA`.
     public init(from decoder: any Decoder) throws {
         if let container = try? decoder.container(keyedBy: CodingKeys.self),
            let kind = try? container.decode(Kind.self, forKey: .kind) {

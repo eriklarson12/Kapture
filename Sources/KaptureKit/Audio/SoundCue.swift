@@ -2,16 +2,8 @@ import Foundation
 
 /// The sound of each cue, as samples.
 ///
-/// Synthesized rather than shipped: two clicks and a chime are not worth an
-/// asset pipeline or a licence to carry, and arithmetic is testable where an
-/// `.aiff` in a bundle is not. Nothing here knows how to make a noise — it
-/// produces bytes, and the app hands them to a player.
-///
-/// Every cue is a function of its input alone. The shutter's noise comes from
-/// a seeded generator with a fixed constant, never `Float.random`, for the
-/// same reason the grain filter is allowed `CIRandomGenerator`: a cue that
-/// rolled fresh randomness would be a different sound on every launch and
-/// nothing could assert it.
+/// Synthesized rather than shipped, so it's licence-free and testable. Every
+/// cue is a pure function of its input — a seeded generator, never `Float.random`.
 public enum SoundCue {
     public static let sampleRate: Double = 44_100
 
@@ -19,9 +11,8 @@ public enum SoundCue {
     /// way to 16-bit and no cue arrives twice as loud as its neighbour.
     public static let peak: Float = 0.7
 
-    /// How long each cue runs. The shutter outlasts
-    /// `CaptureSequence.flashSeconds`, which is correct: the flash is fill
-    /// light and the sound is a shutter, and a shutter has a tail.
+    /// The shutter cue outlasts `CaptureSequence.flashSeconds` on purpose:
+    /// the flash is fill light, the sound is a shutter, and a shutter has a tail.
     public static func duration(of cue: CaptureCue) -> Double {
         switch cue {
         case .tick: 0.04
@@ -39,10 +30,8 @@ public enum SoundCue {
         case .finished: buffer = chime()
         }
         normalize(&buffer)
-        // A buffer that stops mid-swing clicks when the player stops it, so
-        // every cue is ramped to zero rather than trusted to decay there. A
-        // long cue is still ringing when it ends, so its fade is proportional:
-        // three milliseconds cuts a chime audibly and is ample for a click.
+        // Ramped to zero rather than trusted to decay, so a stopped buffer
+        // doesn't click mid-swing. Fade is proportional: 3ms suits a click but not a chime.
         release(&buffer, seconds: max(0.003, duration(of: cue) * 0.05))
         return buffer
     }
@@ -50,8 +39,6 @@ public enum SoundCue {
     public static func wav(for cue: CaptureCue) -> Data {
         wav(samples(for: cue))
     }
-
-    // MARK: - Voices
 
     /// A dry blip. Short enough to sit inside one second of countdown with
     /// room to spare, and pitched above speech so it carries across a room.
@@ -73,9 +60,8 @@ public enum SoundCue {
         return buffer
     }
 
-    /// A burst of band-limited noise with a near-instant attack. The low-pass
-    /// takes the hiss off so it is a mechanism rather than a cymbal; the
-    /// high-pass takes the thud off so it is not a door.
+    /// Band-limited noise: low-pass keeps it a mechanism rather than a cymbal,
+    /// high-pass keeps it from reading as a door.
     private static func click(
         into buffer: inout [Float], at start: Double, level: Double,
         decay: Double, cutoff: Double, seed: UInt64
@@ -111,14 +97,11 @@ public enum SoundCue {
         for index in frames(start)..<buffer.count {
             let t = time(index - frames(start))
             let envelope = attack(t, 0.005) * exp(-t / decay)
-            // A bare sine is a test tone. One quiet partial is enough body to
-            // read as an instrument without becoming a chord.
+            // A bare sine reads as a test tone; one quiet partial is enough to sound like an instrument.
             let tone = sin(2 * .pi * frequency * t) + 0.25 * sin(4 * .pi * frequency * t)
             buffer[index] += Float(tone * envelope * 0.5)
         }
     }
-
-    // MARK: - Envelope and buffers
 
     private static func silence(_ seconds: Double) -> [Float] {
         [Float](repeating: 0, count: frames(seconds))
@@ -166,14 +149,8 @@ public enum SoundCue {
         }
     }
 
-    // MARK: - Container
-
-    /// A canonical 44-byte WAV header and 16-bit little-endian samples.
-    ///
-    /// Written whole, and asserted whole. A header whose length fields are
-    /// short produces a file that exists, has a plausible size, and that
-    /// nothing will open — the same failure as reading a PDF buffer before
-    /// `closePDF()`.
+    /// Canonical 44-byte WAV header, written whole. Short length fields
+    /// produce a file that exists and looks plausible but nothing will open.
     public static func wav(_ samples: [Float]) -> Data {
         let bytes = UInt32(samples.count * 2)
         let rate = UInt32(sampleRate)

@@ -1,11 +1,7 @@
 import Foundation
 
-/// The one blessed JSON configuration for recipes and templates.
-///
-/// Recipes are written to disk and shared between users, so serialization is
-/// part of the format, not a call-site choice. `JSONEncoder`'s stock `.iso8601`
-/// strategy truncates fractional seconds, which makes a decoded recipe unequal
-/// to the one just saved; these keep the timestamp exact while staying readable.
+/// `JSONEncoder`'s stock `.iso8601` strategy truncates fractional seconds,
+/// making a decoded recipe unequal to the one just saved — this keeps it exact.
 public enum RecipeCoding {
     static func formatter() -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()

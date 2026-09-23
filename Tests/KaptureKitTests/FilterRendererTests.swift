@@ -48,9 +48,8 @@ struct FilterRendererTests {
         #expect(abs(Int(green) - Int(blue)) <= 1)
     }
 
-    /// Measured against a neutral patch, because sepia maps luminance onto a
-    /// fixed brown ramp: on an already-warm source it can narrow the spread it
-    /// widens here, which says nothing about whether the filter ran.
+    /// Measured against a neutral patch: sepia maps luminance onto a fixed brown
+    /// ramp, so an already-warm source could narrow the spread it widens here.
     @Test("sepia tints a neutral frame brown, so red leads blue")
     func sepiaWarms() {
         let source = TestImage.solid(width: 64, height: 64, gray: 0.5)
@@ -78,9 +77,8 @@ struct FilterRendererTests {
         #expect(Set(reds).count > 1, "a flat patch came back flat")
     }
 
-    /// The guarantee the export rests on: a 300 dpi render is a *separate*
-    /// render from the preview, so a filter that rolled fresh noise each time
-    /// would save a strip the user never saw.
+    /// The guarantee export rests on: a 300 dpi render is *separate* from the
+    /// preview, so fresh noise each time would save a strip the user never saw.
     @Test("filtering twice gives byte-identical results")
     func filteringIsDeterministic() {
         let source = warm()

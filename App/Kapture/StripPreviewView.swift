@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The finished strip, on black, with nothing around it. No border, no shadow,
-/// no rounded corner: the image meets the panel edge directly, and the only
-/// frame it has is the one the template drew. docs/design-system.md.
+/// No border, no shadow, no rounded corner: the image meets the panel edge
+/// directly, and the only frame it has is the one the template drew.
 struct StripPreviewView: View {
     let image: CGImage
 

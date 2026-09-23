@@ -12,18 +12,13 @@ public enum MovieRenderError: Error, Equatable {
     case writeFailed(String)
 }
 
-/// Stills out to an H.264 movie. The first engine file to import AVFoundation,
-/// permitted by ADR-013: this is the framework's *writing* half, which has no
-/// UI, no hardware and no global state. Capture types stay out of the engine —
-/// `CameraSource` is still the only door to a camera.
+/// Stills out to an H.264 movie. The one engine file allowed to import
+/// AVFoundation (ADR-013), and only its writing half — capture stays behind `CameraSource`.
 public enum MovieRenderer {
     private static let timescale: CMTimeScale = 600
 
     /// Writes `frames` to `url` as an MP4, holding each for `secondsPerFrame`.
-    ///
     /// A URL rather than `Data` because `AVAssetWriter` only writes to a file.
-    /// Every frame is drawn at the first frame's size, which is what
-    /// `RecipeRenderer.renderFrames` already guarantees.
     public static func writeMP4(
         frames: [CGImage], secondsPerFrame: Double, to url: URL
     ) async throws {
@@ -34,9 +29,8 @@ public enum MovieRenderer {
             throw MovieRenderError.oddDimensions(width: width, height: height)
         }
 
-        // `AVAssetWriter` refuses a URL that already exists, and `NSSavePanel`
-        // hands back whatever the user picked, including a file they meant to
-        // overwrite.
+        // `AVAssetWriter` refuses a URL that already exists, but `NSSavePanel`
+        // hands back a file the user may have picked to overwrite.
         try? FileManager.default.removeItem(at: url)
 
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
@@ -94,11 +88,8 @@ public enum MovieRenderer {
         writer.error?.localizedDescription ?? "status \(writer.status.rawValue)"
     }
 
-    /// One frame drawn into a buffer from the adaptor's own pool.
-    ///
     /// `noneSkipFirst` with `byteOrder32Little` is what 32BGRA means to
-    /// CoreGraphics. Getting it wrong swaps red and blue, which reads as a
-    /// colour-management bug and is not one.
+    /// CoreGraphics. Getting it wrong swaps red and blue.
     private static func pixelBuffer(
         for image: CGImage,
         from adaptor: AVAssetWriterInputPixelBufferAdaptor,

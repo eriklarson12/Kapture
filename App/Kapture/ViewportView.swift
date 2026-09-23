@@ -54,9 +54,8 @@ struct ViewportView: View {
 
     @ViewBuilder
     private var content: some View {
-        // The retake branch comes first on purpose. A strip exists during a
-        // retake, and if it won the subject would be posing at a photograph of
-        // themselves instead of at the camera.
+        // Retake comes first on purpose: a strip exists during a retake, and if
+        // it won the subject would be posing at a photograph, not the camera.
         if model.retakingFrame != nil {
             feed
         } else if let strip = model.strip {
@@ -117,8 +116,6 @@ struct ViewportView: View {
         .padding()
     }
 
-    // MARK: - Run state
-
     private var countdown: Int? {
         if case .countingDown(_, let secondsRemaining) = model.runner.state {
             return secondsRemaining
@@ -146,8 +143,6 @@ struct ViewportView: View {
         }
     }
 
-    // MARK: - Chrome
-
     /// One panel for both channels. A failure wins when both are set, because
     /// the thing that did not work is the thing that needs reading.
     @ViewBuilder
@@ -174,18 +169,13 @@ struct ViewportView: View {
         }
     }
 
-    /// The only chrome kiosk mode keeps. "Keyboard only" and "no labels" make a
-    /// mode nobody can use without being told how, so one dim line names the
-    /// keys, and goes away while the run it would interrupt is happening.
-    ///
-    /// During a hold the same line carries the count, because a guest deciding
-    /// whether they have time to do something needs to be told how much.
+    /// The only chrome kiosk mode keeps: one dim line naming the keys, gone
+    /// while the run it would interrupt is happening. Carries the hold count too.
     @ViewBuilder
     private var hint: some View {
         if let seconds = model.restart.secondsRemaining {
-            // Brighter and larger than the legend below, because this one is a
-            // deadline rather than a list of keys: it is how long the person
-            // looking at the strip has left with it.
+            // Brighter and larger than the legend below: this one is a deadline,
+            // not a list of keys.
             Text("Next in \(seconds)s   \u{00B7}   Space to go now   \u{00B7}   Esc to stop")
                 .font(.system(size: 13).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.7))
@@ -200,11 +190,8 @@ struct ViewportView: View {
         }
     }
 
-    /// The scannable link, over the strip it points at.
-    ///
-    /// Kiosk only. Outside it the run controls are along this edge and the
-    /// inspector already shows a smaller one; inside it this is the whole
-    /// point of the mode, and it is content rather than chrome.
+    /// Kiosk only: outside it the run controls are along this edge and the
+    /// inspector already shows a smaller one.
     @ViewBuilder
     private var shareCode: some View {
         if model.isKiosk, model.isSharing, model.strip != nil,
@@ -238,8 +225,7 @@ struct ViewportView: View {
                     redo(shots: strip.recipe.frameIDs.count)
 
                     // A split button rather than one per format: PNG keeps the
-                    // click and Cmd-S it has always had. The rule separates the
-                    // formats that write a file from the two that do not.
+                    // click and Cmd-S it has always had.
                     Menu(saveLabel) {
                         Button("Animated GIF\u{2026}") { Task { await model.exportGIF() } }
                         Button("Movie\u{2026}") { Task { await model.exportMovie() } }
@@ -266,9 +252,8 @@ struct ViewportView: View {
         }
     }
 
-    /// Re-shoot one photo without redoing the run. Numbered rather than named,
-    /// because the numbers are the same ones the progress counter shows during
-    /// a run, so the label is already learned by the time it is needed.
+    /// Numbered rather than named: the numbers match the progress counter shown
+    /// during a run, so the label is already learned by the time it's needed.
     private func redo(shots: Int) -> some View {
         HStack(spacing: 6) {
             Text("Redo")
@@ -298,19 +283,8 @@ struct ViewportView: View {
     }
 }
 
-/// Constrains a live region to the aspect each photo is cropped to.
-///
-/// Without this the feed fills the window while the strip crops to
-/// `photoAspect`, so the subject composes against one rectangle and gets
-/// another, losing roughly a fifth of the width with nothing on screen to
-/// warn them. Letterboxing on black is the whole fix: what is visible is
-/// exactly what reaches the strip.
-///
-/// The empty `Color` is what makes the box real. Applying `.aspectRatio` to a
-/// filling image instead measures the image, which reports a size larger than
-/// it was offered, and the region ends up neither the right shape nor clipped
-/// where it claims to be. A flexible view takes the ratio exactly; the content
-/// then overflows into it and is cut here, once, for every live region.
+/// The empty `Color` makes the box real: `.aspectRatio` on a filling image
+/// instead measures a size larger than what was offered, and the clip does nothing.
 private struct PhotoFraming: ViewModifier {
     let aspect: CGFloat
 

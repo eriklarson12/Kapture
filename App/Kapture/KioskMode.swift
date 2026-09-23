@@ -2,11 +2,8 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// Puts the window in and out of fullscreen for kiosk mode.
-///
 /// macOS 14 SwiftUI has no fullscreen API, and an `NSWindow` is the only thing
-/// that can enter it, so this reaches for one the way `CameraPreview` reaches
-/// for AppKit.
+/// that can enter it, so this reaches for one the way `CameraPreview` reaches for AppKit.
 private struct KioskModifier: ViewModifier {
     @Binding var isKiosk: Bool
     @State private var window: NSWindow?
@@ -35,9 +32,8 @@ extension View {
     }
 }
 
-/// Hands up the `NSWindow` a SwiftUI view ended up in. The window does not
-/// exist while the view is being made, so it is reported from `viewDidMoveTo`
-/// rather than read once.
+/// The window doesn't exist while the view is being made, so it's reported
+/// from `viewDidMoveToWindow` rather than read once.
 private struct WindowReader: NSViewRepresentable {
     let onWindow: (NSWindow?) -> Void
 

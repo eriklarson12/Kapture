@@ -23,9 +23,8 @@ enum TestImage {
         (0..<count).map { _ in solid(width: width, height: height) }
     }
 
-    /// Black on the left half, white on the right, uniform top to bottom. The
-    /// vertical uniformity is deliberate: a mirror test can then sample at any
-    /// row without depending on which way a bitmap buffer is laid out.
+    /// Black on the left half, white on the right, uniform top to bottom, so a
+    /// mirror test can sample any row regardless of buffer layout.
     static func asymmetric(width: Int = 640, height: Int = 480) -> CGImage {
         let space = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = CGContext(
@@ -44,9 +43,8 @@ enum TestImage {
         return context.makeImage()!
     }
 
-    /// A device-grey mask: `personFraction` of the width white on the left,
-    /// the rest black. Grey rather than sRGB because that is the shape
-    /// `BackdropRenderer` produces and `CIBlendWithMask` reads.
+    /// A device-grey mask: `personFraction` of the width white, the rest
+    /// black. Grey, not sRGB, matching what `BackdropRenderer` produces.
     static func mask(
         width: Int = 640, height: Int = 480, personFraction: Double = 0.5
     ) -> CGImage {
@@ -69,10 +67,8 @@ enum TestImage {
         return context.makeImage()!
     }
 
-    /// A red stripe down the leftmost tenth, then black to the midpoint, then
-    /// white. Aspect-filling a wide source into a squarer box crops the stripe
-    /// away; squashing the whole width in would keep it. The stripe is what
-    /// tells the two apart, because a centred boundary moves for neither.
+    /// A red stripe down the leftmost tenth, then black, then white. Cropping
+    /// removes the stripe; squashing keeps it — the centred boundary alone can't tell them apart.
     static func edgeMarked(width: Int = 640, height: Int = 360) -> CGImage {
         let space = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = CGContext(

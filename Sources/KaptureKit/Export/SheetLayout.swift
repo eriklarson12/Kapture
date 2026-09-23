@@ -2,9 +2,7 @@ import CoreGraphics
 import Foundation
 
 /// A page with one or more copies of a strip laid out on it for cutting.
-///
-/// Pure geometry in points, like everything else in the layout engine, so what
-/// a printer will do is asserted in a test rather than discovered on paper.
+/// Pure geometry in points, so what a printer does is asserted in tests.
 public struct SheetLayout: Equatable, Sendable {
     /// 4x6 inches in points. A 2x6 strip tiles it exactly twice, which is why
     /// photobooths print on this stock: one sheet, two strips, one cut.
@@ -17,11 +15,7 @@ public struct SheetLayout: Equatable, Sendable {
     }
 
     /// Where each copy of `template` lands, in points, bottom-left origin.
-    ///
-    /// As many copies as fit across at full size, centred on the page as a
-    /// block. A template too large for the page is scaled down uniformly rather
-    /// than cropped: a cropped strip prints with a border missing down one side
-    /// and reads as a driver fault rather than as a layout that did not fit.
+    /// A template too large for the page is scaled down uniformly, never cropped.
     public func placements(for template: StripTemplate) -> [CGRect] {
         let size = template.canvasSize
         guard size.width > 0, size.height > 0,
@@ -45,10 +39,8 @@ public struct SheetLayout: Equatable, Sendable {
         }
     }
 
-    /// Draws `strip` at each placement, into a context the caller owns.
-    ///
-    /// The PDF sheet and the print job both come through here, so a sheet that
-    /// is printed cannot be laid out differently from one that is saved.
+    /// Draws `strip` at each placement. Shared by the PDF sheet and the print
+    /// job, so a printed sheet can't be laid out differently from a saved one.
     public func draw(_ strip: ResolvedStrip, into context: CGContext) throws {
         let canvas = strip.template.canvasSize
         guard canvas.width > 0, canvas.height > 0 else { return }

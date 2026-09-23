@@ -70,9 +70,8 @@ struct StripStoreTests {
     @Test("lists every stored strip, newest first")
     func listsNewestFirst() throws {
         try withStore { store in
-            // Timestamps spelled out. Two saves can land in the same
-            // millisecond, and then the assertion below is testing the sort's
-            // tie-break rather than the ordering it claims to test.
+            // Timestamps spelled out: two saves landing in the same millisecond
+            // would test the sort's tie-break, not the ordering it claims to.
             var older = try store.save(frames: makeFrames(1), templateID: "classic-strip")
             older.createdAt = StripRecipe.storable(Date(timeIntervalSinceNow: -60))
             try store.update(older)
@@ -161,8 +160,6 @@ struct StripStoreTests {
         }
     }
 
-    // MARK: - Single-frame retake
-
     private func frameFileCount(_ store: StripStore, _ id: UUID) throws -> Int {
         try FileManager.default.contentsOfDirectory(
             at: store.packageURL(for: id).appending(path: "frames", directoryHint: .isDirectory),
@@ -186,8 +183,7 @@ struct StripStoreTests {
     }
 
     /// The old file has to go, or a party's worth of retakes quietly doubles
-    /// the strip on disk. Frames are private to their strip (ADR-011), so
-    /// nothing else can be pointing at it.
+    /// the strip on disk.
     @Test("replacing a frame leaves no orphan behind")
     func replaceFrameRemovesTheOldFile() throws {
         try withStore { store in
@@ -243,8 +239,6 @@ struct StripStoreTests {
             }
         }
     }
-
-    // MARK: - Assets
 
     @Test("an asset saved into a package loads back, pixel for pixel")
     func assetRoundTrip() throws {

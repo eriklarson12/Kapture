@@ -64,8 +64,7 @@ struct PDFRendererTests {
     }
 
     /// The whole claim of a vector page in one check: a caption drawn as glyphs
-    /// puts a font in the page's resources, and a caption drawn as pixels does
-    /// not. Nothing else in the suite can tell the two apart.
+    /// puts a font in the page's resources; drawn as pixels it does not.
     @Test("a caption is embedded as text, not as pixels")
     func captionIsText() throws {
         let captioned = try firstPage(PDFRenderer.page(strip(caption: "Hello")))
@@ -74,11 +73,8 @@ struct PDFRendererTests {
         #expect(resources(bare, "Font") == nil)
     }
 
-    /// Rasterized at print resolution, the page must match the bitmap render of
-    /// the same strip. A PDF that wrapped a 72 dpi raster would pass every
-    /// other check here and fail this one, which is why the last two samples
-    /// straddle a photo's black/white edge: an upscaled raster smears that edge
-    /// over several pixels, and a page drawn at print scale does not.
+    /// A PDF wrapping a 72 dpi raster would pass every other check and fail this
+    /// one: the last two samples straddle a photo edge that an upscaled raster smears.
     @Test("the page draws the same strip the renderer draws")
     func matchesTheBitmapRender() throws {
         let template = BuiltInTemplates.classicStrip
@@ -108,10 +104,8 @@ struct PDFRendererTests {
         #expect(box.width == 288)
         #expect(box.height == 432)
 
-        // Both copies must be drawn, upright and in place: a transform left
-        // behind by the first would move, flip or blank the second.
-        // Rows run from the top, so y 300 of 864 lands inside the second
-        // photo of each copy; x 100 and x 200 straddle its black/white edge.
+        // A transform left behind by the first copy would move, flip or blank
+        // the second; y 300 lands inside the second photo of each copy.
         let sheet = try raster(data, scale: 2)
         for offset in [0, 288] {
             #expect(TestImage.red(sheet, x: offset + 100, y: 300) == 0)

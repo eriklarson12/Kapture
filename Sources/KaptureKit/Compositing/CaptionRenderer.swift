@@ -2,15 +2,10 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-/// Draws a caption into a template's footer band.
-///
-/// Separate from `StripRenderer` so text layout can be exercised without
-/// compositing four photographs, and because text is the one thing on a strip
-/// that is not an image: it is drawn as glyphs at the output scale, so a 300 dpi
-/// export gets 300 dpi type rather than an enlarged preview.
+/// Separate from `StripRenderer` because text is drawn as glyphs at the
+/// output scale, so a 300 dpi export gets 300 dpi type, not an enlarged preview.
 enum CaptionRenderer {
-    /// Draws `caption` centred vertically in `rect`, aligned per the template.
-    /// Does nothing when there is no text or no band to put it in.
+    /// No-op when there is no text or no band to put it in.
     static func draw(
         _ caption: String,
         in rect: CGRect,

@@ -1,8 +1,7 @@
 import Foundation
 
-/// The statuses this booth can answer with. A server that serves one picture
-/// needs six of them, and naming them here keeps the reason phrases out of the
-/// call sites.
+/// The statuses this booth can answer with, named here to keep reason phrases
+/// out of the call sites.
 public enum HTTPStatus: Int, Equatable, Sendable {
     case ok = 200
     case badRequest = 400
@@ -23,23 +22,16 @@ public enum HTTPStatus: Int, Equatable, Sendable {
     }
 }
 
-/// What a read of a socket amounted to.
-///
-/// Three outcomes rather than an optional, because "keep reading" and "this is
-/// not HTTP" want opposite responses: one waits, the other answers and hangs
-/// up. Collapsing them is how a server ends up holding a bad connection open
-/// for ever.
+/// What a read of a socket amounted to. Three outcomes rather than an optional:
+/// "keep reading" and "this is not HTTP" need opposite responses.
 public enum HTTPParse: Equatable, Sendable {
     case incomplete
     case request(HTTPRequest)
     case refused(HTTPStatus)
 }
 
-/// One request, parsed as a value.
-///
-/// Parsing is a pure function so the awkward half of HTTP — a truncated head,
-/// a header with no colon, a path that percent-decodes into something else —
-/// is tested exhaustively without a socket anywhere near it.
+/// One request, parsed as a pure function, so the awkward half of HTTP — a
+/// truncated head, a header with no colon — is tested without a socket.
 public struct HTTPRequest: Equatable, Sendable {
     /// Upper-cased, because a client may send `get`.
     public let method: String
@@ -97,9 +89,8 @@ public struct HTTPRequest: Equatable, Sendable {
             headers[name] = value
         }
 
-        // Nothing here reads a body, and a body left unread is a connection
-        // that disagrees with its client about where the next request starts.
-        // Refusing is honest; ignoring is not.
+        // Nothing here reads a body, and an unread body desyncs the connection
+        // on where the next request starts, so refuse rather than ignore it.
         if let length = headers["content-length"], length != "0" {
             return .refused(.badRequest)
         }
@@ -161,9 +152,8 @@ public struct HTTPResponse: Equatable, Sendable {
     }
 
     public func serialize() -> Data {
-        // `no-store` rather than a lifetime: a link is withdrawn when the next
-        // strip appears, and a phone holding a cached copy of a withdrawn strip
-        // is the one thing this server must not allow.
+        // `no-store`, not a lifetime: a phone must never hold a cached copy
+        // of a strip that's since been withdrawn.
         let head = """
             HTTP/1.1 \(status.rawValue) \(status.reason)\r
             Content-Type: \(contentType)\r

@@ -2,11 +2,8 @@ import AppKit
 import KaptureKit
 import SwiftUI
 
-/// The bridge between the engine's `RGBA` and SwiftUI's `Color`.
-///
-/// It lives app-side on purpose: `RGBA` exists precisely so a template can carry
-/// a colour through JSON without the engine linking AppKit. This file is where
-/// that cost is paid back.
+/// Lives app-side on purpose: `RGBA` exists so a template can carry a colour
+/// through JSON without the engine linking AppKit.
 extension RGBA {
     var color: Color {
         Color(red: red, green: green, blue: blue, opacity: alpha)

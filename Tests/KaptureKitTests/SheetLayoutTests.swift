@@ -26,9 +26,8 @@ struct SheetLayoutTests {
         #expect(places[0] == CGRect(x: 0, y: 0, width: 288, height: 432))
     }
 
-    /// A grid is already the size of the stock, so it prints once and is not
-    /// cut. Nothing in `SheetLayout` knows about columns; this is here so that
-    /// stays true.
+    /// A grid is already the size of the stock, so it prints once, uncut.
+    /// `SheetLayout` knows nothing about columns; this guards that staying true.
     @Test("a 2x2 grid fills the sheet once, uncut")
     func gridFillsOnce() {
         let places = sheet.placements(for: BuiltInTemplates.gridQuad)
@@ -36,9 +35,8 @@ struct SheetLayoutTests {
         #expect(places[0] == CGRect(x: 0, y: 0, width: 288, height: 432))
     }
 
-    /// Scaled rather than cropped. A cropped strip prints with one border
-    /// missing and reads as a printer fault rather than as a layout that did
-    /// not fit.
+    /// Scaled rather than cropped. A cropped strip prints with a border
+    /// missing and reads as a printer fault, not a layout that didn't fit.
     @Test("a template too large for the sheet is scaled down, not cut")
     func oversizeScales() {
         let big = StripTemplate(

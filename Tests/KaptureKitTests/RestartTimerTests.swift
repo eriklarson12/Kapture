@@ -16,9 +16,8 @@ struct RestartTimerTests {
         #expect(clock.waits == [.seconds(1), .seconds(1), .seconds(1), .seconds(1), .seconds(1)])
     }
 
-    /// The number the guest reads. It has to reach 1 rather than 0, and it has
-    /// to go away afterwards, because nil is what the view branches on to know
-    /// there is no hold.
+    /// Must reach 1, not 0, and clear to nil afterwards — nil is what the
+    /// view branches on to know there is no hold.
     @Test("the countdown runs down to one and clears when it ends")
     func countsDown() async {
         let clock = TestClock()

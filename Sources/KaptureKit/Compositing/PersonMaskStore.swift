@@ -1,25 +1,16 @@
 import CoreGraphics
 import Foundation
 
-/// A value computed from one stored frame, remembered by that frame's id.
-///
-/// The key is correct by construction: a frame id names an immutable file,
-/// because a retake mints a new id rather than rewriting one, so a hit can
-/// never be stale. The value is itself optional, so "Vision found nothing in
-/// this frame" is remembered too; without that, an empty room re-asks Vision on
-/// every render.
-///
-/// `@unchecked Sendable` over a lock is the one unsafe assertion here and it is
-/// stated in this one place (ADR-009's pattern): `RecipeRenderer` is `Sendable`
-/// and is captured into a detached task to render off the main actor.
+/// Keyed by frame id (a retake mints a new one, so hits never go stale).
+/// `@unchecked Sendable` (ADR-009): every mutable field stays inside `lock`.
 final class FrameMemo<Value>: @unchecked Sendable {
-    /// Bounded so a long gallery session cannot grow without limit. Cleared
-    /// wholesale rather than evicted least-recently-used: a miss costs one
-    /// request, and an LRU costs a second data structure to keep correct.
+    /// Cleared wholesale rather than LRU-evicted: a miss just costs one
+    /// re-ask, and an LRU costs a second data structure to keep correct.
     static var limit: Int { 32 }
 
     private let lock = NSLock()
     private let compute: @Sendable (CGImage) -> Value?
+    /// `Value?` so "found nothing" is remembered too, not just a miss.
     private var values: [UUID: Value?] = [:]
 
     init(compute: @escaping @Sendable (CGImage) -> Value?) {
@@ -34,9 +25,8 @@ final class FrameMemo<Value>: @unchecked Sendable {
         }
         lock.unlock()
 
-        // Computed outside the lock. Two renders of one frame racing is a
-        // duplicated computation, which is cheap; holding a lock across a
-        // Vision request would stall every other frame behind it.
+        // Computed outside the lock — a duplicated computation from a race
+        // is cheap; holding it across a Vision request would stall everything.
         let value = compute(image)
 
         lock.lock()
@@ -53,13 +43,8 @@ final class FrameMemo<Value>: @unchecked Sendable {
     }
 }
 
-/// Person masks already computed, keyed by frame id.
-///
-/// Segmenting four full-resolution frames costs the better part of a second,
-/// and `restyle` re-renders on every tick of a colour drag.
-///
-/// Injected rather than global, the way `StripStore` takes its root and
-/// `CaptureRunner` takes its clock.
+/// Segmenting four full-resolution frames costs the better part of a
+/// second, and `restyle` re-renders on every tick of a colour drag.
 public final class PersonMaskStore: Sendable {
     private let memo: FrameMemo<CGImage>
 

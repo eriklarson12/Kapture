@@ -80,8 +80,6 @@ struct StripRendererTests {
         }
     }
 
-    // MARK: - Background assets
-
     @Test("a picture larger than the print is shrunk to cover it")
     func downscaleShrinksToCover() {
         let source = TestImage.solid(width: 4000, height: 3000)
@@ -113,9 +111,8 @@ struct StripRendererTests {
         #expect(photo.height == 300)
     }
 
-    /// The distinction that matters for an animation export: a 16:9 shot in a
-    /// 4:3 frame must lose its edges, not be squeezed. A centred boundary sits
-    /// in the middle either way, so the marked edge is what proves it.
+    /// A 16:9 shot in a 4:3 frame must lose its edges, not be squeezed; a
+    /// centred boundary looks the same either way, so the marked edge proves it.
     @Test("a standalone photo is cropped, not squashed")
     func photoCrops() throws {
         let photo = try StripRenderer.photo(
@@ -151,9 +148,8 @@ struct StripRendererTests {
         }
     }
 
-    /// The property a print sheet stands on: `draw` honours the transform the
-    /// caller has already set, and leaves none of its own behind. A save that
-    /// went missing would put the second copy somewhere else, or nowhere.
+    /// The property a print sheet stands on: `draw` honours the caller's
+    /// transform and leaves none of its own behind.
     @Test("the same strip draws twice into one context")
     func drawsTwiceIntoOneContext() throws {
         let template = BuiltInTemplates.classicStrip

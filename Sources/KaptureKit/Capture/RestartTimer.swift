@@ -9,12 +9,8 @@ public enum RestartOutcome: Equatable, Sendable {
 }
 
 /// The hold between two strips: a countdown the guest can see and anything can
-/// interrupt.
-///
-/// Waits through the same injected `CaptureClock` the driver uses, so a
-/// twenty-second hold is a test that takes no time and still asserts twenty
-/// beats. It deliberately knows nothing about runs or strips — `CaptureRunner`
-/// runs one sequence, and what happens after one is the caller's business.
+/// interrupt. Waits through the same injected `CaptureClock` as `CaptureRunner`,
+/// and deliberately knows nothing about runs or strips.
 @MainActor
 @Observable
 public final class RestartTimer {
@@ -33,10 +29,7 @@ public final class RestartTimer {
     }
 
     /// Counts down and reports how it ended. A second call while one is already
-    /// running is refused, the way `CaptureRunner.run` refuses a second run.
-    ///
-    /// A hold of zero fires at once and waits for nothing, so turning the
-    /// stepper down is a way to say "immediately" rather than a special case.
+    /// running is refused. A hold of zero fires at once, so "immediately" needs no special case.
     public func wait() async -> RestartOutcome {
         guard !isWaiting else { return .stopped }
         isWaiting = true
@@ -54,9 +47,8 @@ public final class RestartTimer {
         return shouldStop ? .stopped : .fired
     }
 
-    /// Ends the hold at the next beat. Takes effect on the following call too
-    /// only if that call has not started: `wait` clears the request itself, so
-    /// stopping a timer that is idle cannot silently disarm the next hold.
+    /// Ends the hold at the next beat. `wait` clears the request itself, so
+    /// stopping an idle timer cannot silently disarm the next hold.
     public func stop() {
         stopRequested = true
     }

@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The countdown before a shot. A number, changing. No spin, no pulse: the
-/// design system allows exactly two pieces of motion in this app and neither of
-/// them is decorative.
+/// No spin, no pulse: the design system allows exactly two pieces of motion
+/// in this app and neither of them is decorative.
 struct CountdownOverlay: View {
     let value: Int
 

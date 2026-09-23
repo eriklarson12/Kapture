@@ -7,23 +7,15 @@ public enum QRCodeError: Error, Equatable {
     case encodingFailed
 }
 
-/// A QR code for a URL, drawn the way a phone camera expects to find one.
-///
-/// **Black modules on white, with a quiet zone**, never inverted and never
-/// over the viewport's black. A light-on-dark code is readable by some phones
-/// and not others, and a code with no margin is readable by almost none; both
-/// failures look like "the camera did not see it" rather than like a bug. The
-/// white card is luminance, not colour, so ADR-004 is untouched.
+/// A QR code for a URL. **Black modules on white, with a quiet zone**, never
+/// inverted — a light-on-dark or marginless code silently fails to scan on some phones.
 public enum QRCode {
     /// Four modules is what the specification asks for. Anything less and a
     /// code printed against a dark background stops scanning.
     public static let quietZoneModules = 4
 
-    /// Renders `text` at one integral scale, so every module is the same number
-    /// of pixels and no edge is interpolated into grey.
-    ///
-    /// `minimumSize` is a floor rather than the answer: a code is scaled by a
-    /// whole number of pixels per module and the result is at least this wide.
+    /// Renders `text` at one integral scale, so no edge interpolates into grey.
+    /// `minimumSize` is a floor: the result is scaled up to at least this wide.
     public static func image(for text: String, minimumSize: CGFloat = 512) throws -> CGImage {
         guard let filter = CIFilter(name: "CIQRCodeGenerator") else {
             throw QRCodeError.generatorUnavailable
@@ -40,9 +32,7 @@ public enum QRCode {
         }
 
         let across = modules.width + quietZoneModules * 2
-        // Rounded up, because the name says minimum: rounding down returns a
-        // code smaller than the space it was asked to fill, and the caller has
-        // no way to tell.
+        // Rounded up: `minimumSize` is a floor, and rounding down would silently return less.
         let scale = max(1, Int((minimumSize / CGFloat(across)).rounded(.up)))
         let side = across * scale
 

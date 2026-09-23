@@ -1,13 +1,9 @@
 import CoreGraphics
 import Foundation
 
-/// Why a template file was refused.
-///
-/// Conforms to `LocalizedError` because these are read by a person standing in
-/// front of an import that did not work, not by a `catch` that switches on
-/// them. The app shows `localizedDescription` and nothing else.
+/// Why a template file was refused. Conforms to `LocalizedError` because these
+/// are read by a person standing in front of a failed import, not by a `catch`.
 public enum TemplateImportError: Error, Equatable {
-    /// Did not decode as a template at all.
     case unreadable(String)
     case invalidID(String)
     /// The id of a built-in. A file must never redefine one.
@@ -63,11 +59,8 @@ extension TemplateImportError: LocalizedError {
     }
 }
 
-/// A template as a file.
-///
-/// `decode` is the only way a template enters the app from outside, and
-/// `encode` refuses to write one it would not read back, so the export path
-/// and the import path cannot disagree about what a template is.
+/// A template as a file. `decode` is the only way one enters the app, and
+/// `encode` refuses to write one it would not read back, so import and export can't disagree.
 public enum TemplateImport {
     /// 20 inches. Larger than any paper a desktop printer takes, which is the
     /// point: this is a guard against a typo, not a policy about paper.
@@ -95,13 +88,8 @@ public enum TemplateImport {
         return template
     }
 
-    /// Every rule, in one order, so a file refused on import is refused the
-    /// same way on save.
-    ///
-    /// `isValid` is checked last and is not enough on its own: it only asks
-    /// whether the photos fit. A negative gutter, a negative corner radius and
-    /// a forty-thousand-point canvas all pass it and then draw something
-    /// nobody meant.
+    /// Every rule, in one order, so import and save refuse a file the same way.
+    /// `isValid` alone isn't enough — a negative gutter still passes it.
     public static func validate(_ template: StripTemplate) throws {
         guard !template.id.isEmpty, template.id.allSatisfy(isIDCharacter) else {
             throw TemplateImportError.invalidID(template.id)
@@ -141,11 +129,8 @@ public enum TemplateImport {
         guard template.isValid else { throw TemplateImportError.noRoomForPhotos }
     }
 
-    /// Names the field that went wrong.
-    ///
-    /// `DecodingError.localizedDescription` says "the data couldn't be read
-    /// because it is missing", which to someone editing a template file in
-    /// TextEdit is no help at all. The key is the whole of what they need.
+    /// Names the field that went wrong. `DecodingError.localizedDescription`
+    /// says only "the data couldn't be read because it is missing" — no help to someone editing in TextEdit.
     private static func describe(_ error: DecodingError) -> String {
         switch error {
         case .keyNotFound(let key, _):

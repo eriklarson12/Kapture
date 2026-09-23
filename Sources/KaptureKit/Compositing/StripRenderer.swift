@@ -58,21 +58,8 @@ public struct StripRenderer {
         return output
     }
 
-    /// Draws a strip into a context the caller owns, in points, bottom-left
-    /// origin, at the transform already on it.
-    ///
-    /// Owning the context is the point: the same drawing lands in a bitmap for
-    /// a PNG, in a page for a PDF, and twice on a sheet for a print. Nothing
-    /// here creates a context and nothing here does I/O.
-    ///
-    /// `mirrored` flips each photo about its own centre rather than flipping
-    /// the canvas, so the border and the footer stay the right way round. The
-    /// caption is the first thing that depends on that: it is drawn once, after
-    /// the photos, and is never affected by the flip.
-    ///
-    /// The whole body is bracketed by a save and a restore. A sheet draws this
-    /// more than once, and a transform or a fill colour left behind would move
-    /// the second copy with nothing on screen to say why.
+    /// `mirrored` flips each photo about its own centre, not the canvas, so
+    /// the border and footer stay upright; the caption is drawn once, unaffected.
     public func draw(
         frames: [CGImage],
         template: StripTemplate,
@@ -139,13 +126,8 @@ public struct StripRenderer {
         }
     }
 
-    /// Paints the canvas behind the photos. An image arrives already loaded,
-    /// because `StripRenderer` does no I/O; `RecipeRenderer` resolves the asset
-    /// the same way it resolves the frames.
-    /// Fills `bounds` with a background. Static and shared rather than private
-    /// to `draw`, because a backdrop behind a person is painted from the same
-    /// three cases and a second painter would eventually disagree with this one
-    /// about what 45 degrees means.
+    /// Static and shared, not private to `draw`, so a backdrop painted behind
+    /// a person and the paper's own background never disagree about an angle.
     static func paint(
         _ background: StripBackground, in bounds: CGRect,
         image: CGImage?, context: CGContext
@@ -182,15 +164,13 @@ public struct StripRenderer {
         }
     }
 
-    /// The two ends of a gradient at `angle` degrees, measured
-    /// counter-clockwise from left-to-right, both on the rect's boundary so the
-    /// full colour range is used whichever way the canvas is turned.
+    /// `angle` is degrees counter-clockwise from left-to-right. Both ends
+    /// land on the rect's boundary so the full colour range is used at any angle.
     static func gradientEnds(angle: CGFloat, in bounds: CGRect) -> (CGPoint, CGPoint) {
         let radians = angle * .pi / 180
         let direction = CGVector(dx: cos(radians), dy: sin(radians))
-        // Projecting the half-diagonal onto the direction is what puts both
-        // ends on the boundary: a 45-degree gradient across a tall strip has to
-        // reach further than one straight across it.
+        // Projecting the half-diagonal onto the direction puts both ends on
+        // the boundary — a 45° gradient across a tall strip must reach further.
         let reach = abs(direction.dx) * bounds.width / 2 + abs(direction.dy) * bounds.height / 2
         let centre = CGPoint(x: bounds.midX, y: bounds.midY)
         return (
@@ -199,12 +179,8 @@ public struct StripRenderer {
         )
     }
 
-    /// A background as a standalone raster at `pixelSize`, painted by the same
-    /// fill the paper is.
-    ///
-    /// This is what a person is composited over. It is here rather than in
-    /// `BackdropRenderer` so that there is one painter: a gradient behind a
-    /// subject and a gradient behind the photos read the same angle.
+    /// Lives here, not in `BackdropRenderer`, so one painter is shared — a
+    /// gradient behind a subject and behind the photos read the same angle.
     public static func backdrop(
         _ background: StripBackground, size pixelSize: CGSize, image: CGImage?
     ) throws -> CGImage {
@@ -235,13 +211,8 @@ public struct StripRenderer {
         return output
     }
 
-    /// `image` shrunk to the smallest size that still covers `pixelSize` when
-    /// aspect-filled, or the image itself when it is already that small.
-    ///
-    /// A background is copied into the strip's package, and a phone photo is
-    /// tens of megabytes of detail the 600x1800 canvas cannot print. Never
-    /// enlarges: the cost of a small picture is that it looks soft, not that
-    /// the file grows.
+    /// Never enlarges — a small picture looks soft, but the file never
+    /// grows. A phone photo is far more detail than the canvas can print.
     public static func downscaled(_ image: CGImage, covering pixelSize: CGSize) -> CGImage {
         guard image.width > 0, image.height > 0,
               pixelSize.width > 0, pixelSize.height > 0 else { return image }
@@ -266,11 +237,8 @@ public struct StripRenderer {
         return context.makeImage() ?? image
     }
 
-    /// One photo on its own, aspect-filled into `size` and optionally mirrored.
-    ///
-    /// Shared with the animation exports, so a frame in a GIF is cropped
-    /// exactly the way the same frame is cropped on the paper. Two crops that
-    /// agree by coincidence are two crops that will eventually disagree.
+    /// Shared with the animation exports, so a frame in a GIF crops exactly
+    /// the way the same frame crops on the paper.
     public static func photo(
         _ image: CGImage, size: CGSize, mirrored: Bool = false
     ) throws -> CGImage {

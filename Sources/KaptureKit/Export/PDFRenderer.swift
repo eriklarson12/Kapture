@@ -8,12 +8,8 @@ public enum PDFRenderError: Error, Equatable {
     case emptySheet
 }
 
-/// A strip as a page rather than as pixels.
-///
-/// The media box is in points, so a 2x6 strip is a document that measures two
-/// inches by six however it is opened. Only the photographs are images: the
-/// paper, the gradient, the corners and the caption are drawn into the page and
-/// stay sharp at whatever resolution the printer works at.
+/// A strip as a page rather than as pixels. The media box is in points, so a
+/// 2x6 strip measures two by six inches however it's opened; only the photos are images.
 public enum PDFRenderer {
     /// One strip, one page, at the template's own size.
     public static func page(_ strip: ResolvedStrip) throws -> Data {
@@ -34,12 +30,8 @@ public enum PDFRenderer {
         }
     }
 
-    /// A one-page PDF built by `body`.
-    ///
-    /// `closePDF()` comes before the data is read, and that order is the whole
-    /// reason this is a function rather than four lines at each call site.
-    /// Reading the buffer first returns bytes that are truncated rather than
-    /// absent, so the file exists, has a plausible size, and does not open.
+    /// A one-page PDF built by `body`. `closePDF()` must come before the data
+    /// is read, or the buffer comes back truncated — a file that looks fine but won't open.
     private static func document(
         mediaBox: CGRect, _ body: (CGContext) throws -> Void
     ) throws -> Data {

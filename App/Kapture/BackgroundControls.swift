@@ -4,16 +4,8 @@ import KaptureKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The background row of the Appearance section: solid, gradient, or a picture
-/// the user chose.
-///
-/// Its own file because it is the one control in the inspector with more than
-/// one shape, and because picking a file is a side effect the rest of the form
-/// does not have.
-///
-/// The labels are parameters because the Photos section asks the same three
-/// questions about what goes behind a person. One control, two callers, rather
-/// than a fork that drifts.
+/// Its own file because it's the one inspector control with more than one shape and
+/// a file-picker side effect. Labels are parameters so Photos can reuse it, not fork it.
 struct BackgroundControls: View {
     var title = "Background"
     var solidLabel = "Paper"
@@ -49,8 +41,6 @@ struct BackgroundControls: View {
         }
     }
 
-    // MARK: - Kind
-
     private enum BackgroundKind: String, CaseIterable {
         case solid, gradient, image
 
@@ -71,9 +61,8 @@ struct BackgroundControls: View {
         }
     }
 
-    /// Switching kind keeps the colour that was already there, so moving from
-    /// solid to gradient starts from what the user was looking at rather than
-    /// from an unrelated default.
+    /// Switching kind keeps the colour that was already there, so moving to
+    /// gradient starts from what the user was looking at, not a default.
     private var kind: Binding<BackgroundKind> {
         Binding(
             get: { currentKind },
@@ -93,8 +82,6 @@ struct BackgroundControls: View {
             }
         )
     }
-
-    // MARK: - Bindings
 
     private var solidColor: Binding<Color> {
         Binding(
@@ -141,8 +128,6 @@ struct BackgroundControls: View {
         }
         return (background.representativeColor, .ink, 90)
     }
-
-    // MARK: - Picking a file
 
     private func chooseImage() {
         let panel = NSOpenPanel()

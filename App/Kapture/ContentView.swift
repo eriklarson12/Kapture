@@ -7,10 +7,8 @@ struct ContentView: View {
     @Bindable var model: BoothModel
 
     var body: some View {
-        // The inspector is removed; the layout around it is not. Branching the
-        // whole view would give `ViewportView` a new identity, fire its
-        // `onDisappear`, and stop and restart the camera on every entry to
-        // kiosk — a black stall at exactly the wrong moment.
+        // The inspector is removed, not the layout around it: branching the whole
+        // view would give `ViewportView` a new identity and restart the camera.
         HSplitView {
             ViewportView(model: model)
                 .frame(minWidth: 560)

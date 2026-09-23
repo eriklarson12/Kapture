@@ -16,9 +16,8 @@ struct CaptionRendererTests {
         )
     }
 
-    /// Bitmap row 0 is the top of the canvas, while `footerRect()` is in
-    /// CoreGraphics coordinates whose origin is bottom-left. The band is
-    /// therefore measured down from the far edge.
+    /// Bitmap row 0 is the top; `footerRect()` uses CoreGraphics' bottom-left
+    /// origin, so the band is measured down from the far edge.
     private func footerRows(_ image: CGImage, _ template: StripTemplate) -> Range<Int> {
         let rect = template.footerRect()
         return (image.height - Int(rect.maxY))..<(image.height - Int(rect.minY))

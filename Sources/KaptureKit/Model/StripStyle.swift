@@ -1,10 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Where a caption sits in the footer band.
-///
-/// Defined here rather than reusing SwiftUI's `TextAlignment`, which the engine
-/// may not import. The raw values are what reach `recipe.json`.
+/// Defined here, not SwiftUI's `TextAlignment`, which the engine may not
+/// import — the raw values are what reach `recipe.json`.
 public enum CaptionAlignment: String, Codable, CaseIterable, Sendable {
     case leading
     case center
@@ -19,12 +17,8 @@ public enum CaptionAlignment: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// Per-strip overrides on top of a template.
-///
-/// Every field is optional and `nil` means "follow the template". That is what
-/// keeps a template edit meaningful: a field the user never touched still moves
-/// when its template moves, which is the whole of roadmap 4.4. Storing resolved
-/// values here instead would freeze every strip at the moment it was shot.
+/// Every field is optional; nil means "follow the template" — a field the
+/// user never touched still moves when its template moves (roadmap 4.4).
 public struct StripStyle: Codable, Equatable, Sendable {
     public var background: StripBackground?
     public var foreground: RGBA?

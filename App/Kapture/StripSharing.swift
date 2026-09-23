@@ -2,16 +2,8 @@ import CoreGraphics
 import Foundation
 import KaptureKit
 
-/// Handing the strip to the phone the guest is already holding.
-///
-/// One strip is shared at a time — the most recent — behind a token that makes
-/// a stale link fail closed rather than resolve to whoever is in front of the
-/// camera now. Tokens are minted in memory and never written down, so quitting
-/// Kapture ends every link there has ever been.
-///
-/// Nothing is cached. A request re-renders from the recipe on disk, which is
-/// also why a link keeps working while the queue moves on: the strip it names
-/// does not have to still be in memory.
+/// One strip is shared at a time, behind a token that makes a stale link fail
+/// closed rather than resolve to whoever is in front of the camera now.
 extension BoothModel {
     /// Starts the listener and points it at whatever is on screen.
     func startSharing() async {
@@ -33,9 +25,8 @@ extension BoothModel {
                 refreshLink()
             }
         } catch {
-            // A sandbox missing `network.server`, or a port that will not bind.
-            // Either way it is text on screen, never a silent switch that does
-            // nothing.
+            // A sandbox missing `network.server`, or a port that won't bind — either
+            // way it's text on screen, never a silent switch that does nothing.
             shareError = error.localizedDescription
             isSharing = false
         }
@@ -51,9 +42,8 @@ extension BoothModel {
         shareQR = nil
     }
 
-    /// Withdraws the previous link and mints one for this strip. Called when a
-    /// strip is built, which is the moment the old one stops being what is on
-    /// screen.
+    /// Withdraws the previous link and mints one for this strip, called the
+    /// moment the old one stops being what's on screen.
     func share(_ recipe: StripRecipe) {
         guard isSharing else { return }
         sharedRecipe = recipe.id
@@ -61,10 +51,8 @@ extension BoothModel {
         refreshLink()
     }
 
-    /// Rebuilds the URL and its code. The address is re-read every time rather
-    /// than remembered: DHCP can move a laptop mid-party, and a code carrying
-    /// yesterday's address fails in a way nobody can diagnose from across a
-    /// room.
+    /// Re-read every time rather than remembered: DHCP can move a laptop mid-party,
+    /// and a code carrying yesterday's address fails in a way nobody can diagnose.
     private func refreshLink() {
         guard let port = sharePort, let token = shareToken,
               let host = LocalAddress.ipv4() else {
@@ -80,8 +68,6 @@ extension BoothModel {
         shareURL = url
         shareQR = url.flatMap { try? QRCode.image(for: $0.absoluteString) }
     }
-
-    // MARK: - Answering
 
     private func respond(to request: HTTPRequest) async -> HTTPResponse {
         guard let route = ShareRoute.parse(request.path) else {

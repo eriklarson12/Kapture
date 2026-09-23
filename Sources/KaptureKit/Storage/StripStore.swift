@@ -9,8 +9,7 @@ public enum StripStoreError: Error, Equatable {
 }
 
 /// Strips on disk. One strip is one package directory holding its recipe and
-/// its frames (ADR-011), so deleting a strip is a single filesystem operation
-/// and no frame is ever shared between two strips.
+/// frames (ADR-011), so deleting a strip is a single filesystem operation.
 ///
 /// ```
 /// <root>/Strips/<recipe-uuid>.kapturestrip/
@@ -19,12 +18,9 @@ public enum StripStoreError: Error, Equatable {
 ///     assets/<asset-uuid>.png
 /// ```
 ///
-/// `assets/` holds pictures the strip refers to but did not shoot, currently a
-/// background image (ADR-012). Same lifetime as the strip, deleted with it,
-/// never shared — the reasoning ADR-011 applied to frames, one directory over.
-///
-/// `root` is injected: the app passes Application Support, tests pass a
-/// temporary directory.
+/// `assets/` holds pictures the strip refers to but did not shoot (a
+/// background image, ADR-012) — same lifetime as the strip, never shared.
+/// `root` is injected: the app passes Application Support, tests a temp directory.
 public struct StripStore: Sendable {
     public static let packageExtension = "kapturestrip"
 
@@ -46,8 +42,7 @@ public struct StripStore: Sendable {
     }
 
     /// Writes the frames and a recipe describing them, and returns that recipe.
-    /// Frames are stored in `index` order, which is the order the renderer zips
-    /// them against `photoRects()`.
+    /// Frames are stored in `index` order, matching `photoRects()`.
     @discardableResult
     public func save(
         frames: [CaptureFrame],
@@ -74,10 +69,8 @@ public struct StripStore: Sendable {
         let manager = FileManager.default
         try manager.createDirectory(at: stripsURL, withIntermediateDirectories: true)
 
-        // Built aside and moved into place, so a crash mid-write cannot leave a
-        // half-written package for `listRecipes()` to trip over. The staging
-        // name is dot-prefixed and carries no package extension, so a leftover
-        // is invisible to the listing.
+        // Built aside and moved into place, so a crash mid-write can't leave a
+        // half-written package; the dot-prefixed name also stays invisible to `listRecipes()`.
         let staging = stripsURL.appending(
             path: ".staging-\(recipe.id.uuidString)", directoryHint: .isDirectory
         )
@@ -103,12 +96,8 @@ public struct StripStore: Sendable {
         return recipe
     }
 
-    /// Rewrites a package's recipe in place, leaving the frames alone. Every
-    /// edit after the shot goes through here: template, style, caption, mirror.
-    ///
-    /// A single small file needs no staging directory of its own; `.atomic`
-    /// already writes aside and renames. The directory staging in `save` exists
-    /// because a package is many files, not because a write is risky.
+    /// Rewrites a package's recipe in place, leaving the frames alone. A single
+    /// small file needs no staging directory; `.atomic` already writes aside and renames.
     public func update(_ recipe: StripRecipe) throws {
         let package = packageURL(for: recipe.id)
         guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false)) else {
@@ -119,15 +108,8 @@ public struct StripStore: Sendable {
             .write(to: package.appending(path: "recipe.json"), options: .atomic)
     }
 
-    /// Swaps one frame inside an existing package and returns the recipe that
-    /// names it. The old frame is removed: frames are private to their strip
-    /// (ADR-011), so nothing else can be pointing at it.
-    ///
-    /// The order is the whole of the correctness here. The new frame is
-    /// written, then the recipe that points at it, then the old frame is
-    /// removed. A crash after the recipe write leaves an orphan file, which is
-    /// invisible and costs a couple of megabytes; a crash after an early delete
-    /// would leave a strip that cannot render at all.
+    /// Swaps one frame and returns the recipe that names it. Order matters:
+    /// write new frame, then recipe, then delete old — an early delete risks an unrenderable strip.
     public func replaceFrame(
         _ image: CGImage, at index: Int, in recipe: StripRecipe
     ) throws -> StripRecipe {
@@ -157,9 +139,8 @@ public struct StripStore: Sendable {
         return updated
     }
 
-    /// Copies an image into a strip's own package and returns the id that
-    /// names it. The directory is created on first use, so a strip that never
-    /// wanted one does not carry an empty folder.
+    /// Copies an image into a strip's own package and returns its id. The
+    /// directory is created on first use, so a strip that never used one carries no empty folder.
     public func saveAsset(_ image: CGImage, in id: UUID) throws -> UUID {
         let package = packageURL(for: id)
         guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false)) else {
@@ -219,9 +200,8 @@ public struct StripStore: Sendable {
                 }
                 return try? RecipeCoding.decoder().decode(StripRecipe.self, from: data)
             }
-            // Ties break on id so the order is total. Two strips cannot really
-            // share a millisecond — a run takes seconds — but an arbitrary
-            // order for equal keys is a flake waiting for a fast machine.
+            // Ties break on id so the order is total — an arbitrary order for
+            // equal keys is a flake waiting for a fast machine.
             .sorted {
                 $0.createdAt == $1.createdAt
                     ? $0.id.uuidString < $1.id.uuidString

@@ -1,12 +1,8 @@
 import KaptureKit
 import SwiftUI
 
-/// Template and sequence controls. Every control here edits a value that lives
-/// in the recipe or the timing plan, never the stored frames.
-///
-/// Appearance and caption *styling* need a recipe to edit, so they stay
-/// disabled until the first strip exists. Layout, sequence and the caption text
-/// configure the *next* run and are live before it.
+/// Appearance and caption *styling* need a recipe to edit, so they stay disabled
+/// until the first strip exists; layout, sequence and caption text are live before it.
 struct InspectorView: View {
     @Bindable var model: BoothModel
 
@@ -88,9 +84,8 @@ struct InspectorView: View {
             }
             .disabled(model.strip == nil)
 
-            // The text is live before the first strip and the styling is not:
-            // a caption typed here is carried by every strip shot after it, so
-            // a party is captioned once rather than once a run.
+            // The text is live before the first strip: a caption typed here is
+            // carried by every strip shot after it, so a party is captioned once.
             Section("Caption") {
                 TextField("Caption", text: caption, prompt: Text("None"))
                 Button("Insert date") { insertDate() }
@@ -121,9 +116,8 @@ struct InspectorView: View {
                     in: 0...5,
                     step: 0.5
                 )
-                // Here rather than in a menu because this section is what a
-                // run does, and because kiosk mode is configured before it is
-                // entered, exactly like the template.
+                // Here rather than in a menu: kiosk mode is configured before it
+                // is entered, exactly like the template.
                 Toggle("Sound", isOn: sound)
                 Toggle("Auto-restart in kiosk", isOn: $model.autoRestart)
                 Stepper("Hold: \(model.restart.seconds)s", value: hold, in: 5...60, step: 5)
@@ -142,9 +136,8 @@ struct InspectorView: View {
                             .textSelection(.enabled)
                     }
                     if let code = model.shareQR {
-                        // Small here and large in the viewport: this one is for
-                        // the operator checking it works, not for a guest
-                        // across a room.
+                        // Small here, large in the viewport: this one is for the
+                        // operator checking it works, not a guest across a room.
                         Image(decorative: code, scale: 1)
                             .resizable()
                             .interpolation(.none)
@@ -173,9 +166,8 @@ struct InspectorView: View {
             Button("Import Template\u{2026}") { Task { await model.importTemplate() } }
             Button("Save Template\u{2026}") { Task { await model.saveTemplate() } }
                 .disabled(model.strip == nil)
-            // Named for what it does. Editing a built-in copies it first, and
-            // a menu item that said otherwise would be lying about which
-            // template the sheet is about to change.
+            // Named for what it does: editing a built-in copies it first, and a
+            // menu item that said otherwise would misname which template changes.
             Button(model.canRemoveTemplate ? "Edit Template\u{2026}" : "Duplicate & Edit\u{2026}") {
                 model.editTemplate()
             }
@@ -191,11 +183,8 @@ struct InspectorView: View {
         .accessibilityLabel("Template actions")
     }
 
-    // MARK: - Bindings
-
-    /// Every appearance edit goes through here: materialize a style, change one
-    /// field, and drop it again when nothing is overridden, so a strip that
-    /// follows its template stores no style at all.
+    /// Materializes a style, changes one field, and drops it again when nothing
+    /// is overridden, so a strip that follows its template stores no style at all.
     private func setStyle(_ apply: @escaping (inout StripStyle) -> Void) {
         Task {
             await model.restyle { recipe in
@@ -314,16 +303,12 @@ struct InspectorView: View {
         )
     }
 
-    /// Writes the strip's own date into the caption field, or today's when
-    /// there is no strip yet — which is when a party is being set up. It is
-    /// ordinary text from that moment on, so there is one field and one
-    /// rendering rule.
+    /// Falls back to today's date when there is no strip yet — set-up time.
+    /// It's ordinary text from that moment, so there's one field, one rendering rule.
     private func insertDate() {
         let date = model.strip?.recipe.createdAt ?? Date()
         model.setCaption(Self.dateFormatter.string(from: date))
     }
-
-    // MARK: - Display
 
     private var shotCount: Int {
         model.strip?.recipe.frameIDs.count ?? model.template.frameCount

@@ -6,13 +6,8 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Debug builds only. Stock photos stand in for the camera, and the app opens on
-/// one scene, so the landing page screenshots can be retaken without a person in
-/// front of the Mac.
-///
-/// `KAPTURE_DEMO` names a directory holding `Photos/*.jpg`. It is also the store
+/// `KAPTURE_DEMO` names a directory holding `Photos/*.jpg`; it is also the store
 /// root, so a demo run never writes into the real library.
-/// `KAPTURE_DEMO_SCENE` is `capture`, `editor` or `templates`.
 enum DemoMode {
     static let root: URL? = ProcessInfo.processInfo.environment["KAPTURE_DEMO"]
         .map { URL(filePath: $0, directoryHint: .isDirectory) }

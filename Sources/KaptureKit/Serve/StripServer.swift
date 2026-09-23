@@ -7,12 +7,7 @@ public enum StripServerError: Error, Equatable {
 }
 
 /// A one-connection-at-a-time HTTP/1.1 server for handing a strip to a phone.
-///
-/// The interesting part is not here: parsing, routing and the page are values
-/// in `HTTPMessage`, `ShareRoute` and `SharePage`, tested without a socket.
-/// This is the thin layer that reads bytes, calls the injected handler, writes
-/// the answer and hangs up — the same division `CameraSource` makes between a
-/// device and the driver that uses one.
+/// Parsing, routing and the page are tested values elsewhere; this is just the thin socket layer.
 @MainActor
 public final class StripServer {
     public typealias Handler = @Sendable (HTTPRequest) async -> HTTPResponse
@@ -30,11 +25,8 @@ public final class StripServer {
 
     public var isRunning: Bool { listener != nil }
 
-    /// Starts on an ephemeral port and waits until it is actually listening.
-    ///
-    /// Ephemeral rather than a memorable 8080: there is nothing to configure,
-    /// nothing to collide with on a machine that already runs a dev server, and
-    /// the link is carried by a QR code that does not care what the number is.
+    /// Starts on an ephemeral port and waits until actually listening. Nothing
+    /// to configure or collide with — the QR code doesn't care what the number is.
     @discardableResult
     public func start() async throws -> UInt16 {
         if let port { return port }
@@ -90,8 +82,6 @@ public final class StripServer {
         port = nil
     }
 
-    // MARK: - One connection
-
     private static func serve(
         _ connection: NWConnection, on queue: DispatchQueue, handle: Handler
     ) async {
@@ -114,9 +104,8 @@ public final class StripServer {
         }
     }
 
-    /// GET and HEAD only. A HEAD still runs the handler, because the length it
-    /// reports has to be the length a GET would send; a HEAD that guesses is
-    /// worse than no HEAD at all.
+    /// GET and HEAD only. HEAD still runs the handler so its reported length
+    /// matches what a GET would actually send.
     private static func answer(to request: HTTPRequest, handle: Handler) async -> HTTPResponse {
         switch request.method {
         case "GET": await handle(request)
@@ -144,12 +133,8 @@ public final class StripServer {
     }
 }
 
-/// Resumes a continuation exactly once.
-///
-/// `stateUpdateHandler` reports every state change, so a listener that goes
-/// ready and later fails would resume twice, and a continuation resumed twice
-/// traps. The unsafe assertion is a lock around one optional, stated here in
-/// one place the way `SessionBox` states its own (ADR-009).
+/// Resumes a continuation exactly once. `stateUpdateHandler` can report ready
+/// then failed, and a continuation resumed twice traps (ADR-009).
 private final class Gate: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<UInt16, Error>?

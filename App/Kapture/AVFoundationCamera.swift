@@ -2,15 +2,8 @@ import AVFoundation
 import CoreGraphics
 import KaptureKit
 
-/// The only file in the project that imports AVFoundation. Everything else
-/// depends on the `CameraSource` protocol, which is what keeps the engine
-/// testable without hardware.
-/// `AVCaptureSession` is not annotated `Sendable`, but Apple's documented
-/// pattern is to serialize configuration and start/stop on one dedicated queue
-/// while the preview layer attaches from the main thread. This box states that
-/// guarantee explicitly, which is honest about what is being asserted;
-/// `@preconcurrency import` would only downgrade the diagnostic and assert the
-/// same thing silently.
+/// `AVCaptureSession` isn't `Sendable`; this box states the guarantee Apple's
+/// serialize-on-one-queue pattern relies on, instead of silencing it with `@preconcurrency`.
 private final class SessionBox: @unchecked Sendable {
     let session = AVCaptureSession()
 }
@@ -106,11 +99,8 @@ final class AVFoundationCamera: NSObject, CameraSource {
         }
         session.addOutput(photoOutput)
 
-        // Left to itself AVFoundation mirrors a front-facing camera, so the
-        // handedness of a stored frame would be inherited rather than chosen
-        // and nothing in the project could say which way round it is. Pinned
-        // here, a stored frame is always true optics and `recipe.mirrorOutput`
-        // is the only thing that ever flips a photo.
+        // AVFoundation mirrors a front camera by default; pinned off here so a stored
+        // frame is always true optics and `recipe.mirrorOutput` is the only flip.
         if let connection = photoOutput.connection(with: .video),
            connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
@@ -119,9 +109,8 @@ final class AVFoundationCamera: NSObject, CameraSource {
     }
 }
 
-/// Bridges the delegate callback to an async result. Separate from the camera
-/// because AVFoundation calls back on its own queue and expects a fresh
-/// delegate per capture.
+/// Bridges the delegate callback to an async result. Separate from the camera because
+/// AVFoundation calls back on its own queue and expects a fresh delegate per capture.
 private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
     private let completion: (Result<CGImage, Error>) -> Void
 

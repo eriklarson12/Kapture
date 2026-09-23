@@ -18,8 +18,6 @@ struct StripTemplateTests {
         }
     }
 
-    // MARK: - Grids
-
     /// Row-major, and element 0 is the top-left. Frames are zipped against
     /// this order, so reversing it would silently shuffle the photos.
     @Test("a grid fills row by row, first shot top-left")
@@ -46,8 +44,7 @@ struct StripTemplateTests {
     }
 
     /// The caption band spans the paper, not one column. Reusing `photoWidth`
-    /// for it would have shrunk the footer to half the strip the moment a
-    /// second column existed.
+    /// would shrink the footer to half the strip once a second column exists.
     @Test("the footer spans the paper whatever the column count")
     func gridFooter() {
         let template = BuiltInTemplates.gridQuad
@@ -104,8 +101,7 @@ struct StripTemplateTests {
     }
 
     /// Stated per row now that a grid exists: two photos side by side share a
-    /// row, so the old "every rect is above the next" rule is only true down a
-    /// column.
+    /// row, so "every rect is above the next" is only true down a column.
     @Test("never overlaps two photos")
     func noOverlap() {
         for template in BuiltInTemplates.all {

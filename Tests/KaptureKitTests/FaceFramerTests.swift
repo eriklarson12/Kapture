@@ -9,8 +9,6 @@ struct FaceFramerTests {
     private let classicAspect = BuiltInTemplates.classicStrip.photoAspect
     private let centre = CGPoint(x: 0.5, y: 0.5)
 
-    // MARK: - Geometry
-
     /// A frame whose faces are centred must crop exactly as a frame with none
     /// does, or turning the feature on moves every well-composed photo.
     @Test("a centred focus crops the region the centred aspect-fill shows")
@@ -93,8 +91,6 @@ struct FaceFramerTests {
         }
     }
 
-    // MARK: - Faces
-
     @Test("no faces is no focus")
     func noFaces() {
         #expect(FaceFramer.focus(of: []) == nil)
@@ -120,8 +116,6 @@ struct FaceFramerTests {
         let focus = FaceFramer.focus(of: [subject, poster])
         #expect(focus == CGPoint(x: subject.midX, y: subject.midY))
     }
-
-    // MARK: - Cropping
 
     @Test("cropping toward the left keeps the stripe a centred crop loses")
     func croppedKeepsTheLeftEdge() {
@@ -150,8 +144,6 @@ struct FaceFramerTests {
         let image = TestImage.solid(width: 400, height: 400)
         #expect(FaceFramer.cropped(image, aspect: 1, focus: CGPoint(x: 0, y: 0)) === image)
     }
-
-    // MARK: - Vision
 
     /// The one test that runs Vision. It claims only that a frame with nobody
     /// in it gets no focus, so the caller crops about the centre as before.

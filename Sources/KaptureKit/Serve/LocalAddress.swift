@@ -1,15 +1,11 @@
 import Darwin
 import Foundation
 
-/// The address a phone on the same Wi-Fi would use to reach this Mac.
-///
-/// Read when the server starts and again whenever a strip is shared, because
-/// DHCP can move a laptop mid-party and a QR code carrying yesterday's address
-/// fails in a way nobody can diagnose from the other side of a room.
+/// The address a phone on the same Wi-Fi would use to reach this Mac. Read
+/// fresh on every share, because DHCP can move a laptop mid-party.
 public enum LocalAddress {
-    /// Ethernet and Wi-Fi, in that order of preference. Everything else on a
-    /// Mac is something a phone cannot route to: `lo0` is this machine,
-    /// `awdl0` and `llw0` are AirDrop's direct links, and `utun*` are VPNs.
+    /// Ethernet and Wi-Fi only — `lo0` is this machine, `awdl0`/`llw0` are
+    /// AirDrop, `utun*` are VPNs, none of which a phone can route to.
     private static func isUsable(_ name: String) -> Bool {
         name.hasPrefix("en")
     }

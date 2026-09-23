@@ -74,14 +74,12 @@ struct BackdropRendererTests {
         #expect(abs(BackdropRenderer.coverage(of: TestImage.mask(personFraction: 0.25)) - 0.25) < 0.05)
     }
 
-    /// The only test that runs Vision, and it asserts nothing about what Vision
-    /// decided. A flat grey patch holds no person, so the claim is the one that
-    /// must hold whatever the model says: the caller still gets a photograph.
+    /// The only test that runs Vision. A flat patch holds no person, so the only
+    /// guarantee tested is that the caller still gets a photograph back either way.
     @Test("a frame with no person in it still comes back a photograph")
     func visionOnAFlatPatchIsSafe() {
         let frame = TestImage.solid(width: 320, height: 240)
         guard let mask = BackdropRenderer.mask(for: frame) else {
-            // The expected path: no person, so no mask, so no replacement.
             return
         }
         let output = BackdropRenderer.composite(frame, over: red(), mask: mask)

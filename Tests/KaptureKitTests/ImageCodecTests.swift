@@ -37,8 +37,6 @@ struct ImageCodecTests {
         }
     }
 
-    // MARK: - GIF
-
     private func gifSource(_ data: Data) -> CGImageSource? {
         CGImageSourceCreateWithData(data as CFData, nil)
     }
@@ -56,9 +54,8 @@ struct ImageCodecTests {
         #expect(CGImageSourceGetCount(source) == 4)
     }
 
-    /// Both keys, because the clamped one is floored by decoders and the
-    /// unclamped one is unknown to the old ones. A GIF that writes only one
-    /// plays at the wrong speed somewhere.
+    /// Both keys: the clamped one is floored by decoders, and old decoders
+    /// don't know the unclamped one exists — writing only one misplays the speed.
     @Test("a GIF records its delay in both the clamped and unclamped keys")
     func gifDelay() throws {
         let data = try ImageCodec.encodeGIF(TestImage.frames(2, width: 40, height: 30), delaySeconds: 0.6)

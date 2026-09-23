@@ -8,19 +8,11 @@ public enum ImageCodecError: Error, Equatable {
     case decodeFailed
 }
 
-/// The one place images become bytes and back. The frame store, the strip
-/// export and the animated GIF export all go through here, so every encoder is
-/// configured once.
-///
-/// PNG rather than HEIC, deliberately: the round trip is pixel-exact, which is
-/// what makes the frame store testable by comparing images rather than by
-/// trusting the encoder. HEIC would cut a strip's roughly 8 MB of frames by
-/// about tenfold and is a change behind this API alone, if a long party ever
-/// makes that matter.
+/// The one place images become bytes and back, so every encoder is configured
+/// once. PNG rather than HEIC: the round trip is pixel-exact, testable by comparing images directly.
 public enum ImageCodec {
-    /// Encodes `image` as PNG. `dpi` writes physical-size metadata, which is
-    /// what makes an exported strip print at a true 2x6 inches rather than at
-    /// whatever size the printer guesses.
+    /// Encodes `image` as PNG. `dpi` writes physical-size metadata, so an
+    /// exported strip prints at a true 2x6 inches rather than a guess.
     public static func encodePNG(_ image: CGImage, dpi: CGFloat? = nil) throws -> Data {
         let buffer = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
@@ -50,14 +42,8 @@ public enum ImageCodec {
         return image
     }
 
-    /// Encodes `frames` as a GIF that loops forever, holding each frame for
-    /// `delaySeconds`.
-    ///
-    /// Both delay keys are written on purpose. Decoders clamp
-    /// `kCGImagePropertyGIFDelayTime` to a floor — historically 0.1s, in some
-    /// browsers higher — and `kCGImagePropertyGIFUnclampedDelayTime` is the one
-    /// that carries the real number, but older readers do not know it exists.
-    /// Writing one of the two gets timing that is wrong somewhere.
+    /// Encodes `frames` as a GIF that loops forever. Both delay keys are
+    /// written on purpose: decoders clamp the plain one, older ones don't know the unclamped one exists.
     public static func encodeGIF(_ frames: [CGImage], delaySeconds: Double) throws -> Data {
         guard !frames.isEmpty else { throw ImageCodecError.encodeFailed }
         let buffer = NSMutableData()

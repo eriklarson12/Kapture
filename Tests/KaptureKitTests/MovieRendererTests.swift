@@ -82,10 +82,8 @@ struct MovieRendererTests {
         }
     }
 
-    /// 32BGRA drawn through a CGContext is one byte-order mistake away from
-    /// swapping red and blue, which looks like a colour-management bug and is
-    /// not one. Nothing else in the suite would catch it: the size, the
-    /// duration and the file are all correct either way.
+    /// 32BGRA is one byte-order mistake away from swapping red and blue. Nothing
+    /// else in the suite would catch it: size, duration and file are correct either way.
     @Test("the movie keeps red red")
     func preservesChannelOrder() async throws {
         try await withOutputURL { url in

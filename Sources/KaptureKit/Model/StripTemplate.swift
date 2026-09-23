@@ -1,27 +1,20 @@
 import CoreGraphics
 import Foundation
 
-/// A strip layout expressed in points, where one point is 1/72 inch. Geometry is
-/// resolution-independent: the renderer scales the whole canvas by a factor
-/// chosen at draw time, so a single template serves both the on-screen preview
-/// and a 300 dpi print export.
-///
-/// A template is also a file people are meant to open and edit, so the coder at
-/// the bottom of this file is hand-written rather than synthesized.
+/// One point is 1/72 inch; the renderer scales the whole canvas at draw
+/// time, so one template serves both the preview and a 300 dpi export.
 public struct StripTemplate: Equatable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var frameCount: Int
-    /// Photos per row. 1 is the classic stack; 2 is a grid two across. The
-    /// grid fills row-major, so element 0 is the top-left photo and the frames
-    /// zip against `photoRects()` exactly as they always have.
+    /// 1 is a stack, 2 a grid two across — fills row-major, so element 0 is
+    /// the top-left photo, matching `photoRects()`.
     public var columns: Int
     public var canvasSize: CGSize
     /// Border thickness on all four sides.
     public var outerInset: CGFloat
-    /// Space between adjacent photos, in both directions. A grid's horizontal
-    /// gap and a stack's vertical gap are the same visual thing, so they are
-    /// the same number rather than two fields kept equal by hand.
+    /// A grid's horizontal gap and a stack's vertical gap are the same
+    /// visual thing, so one field, not two kept equal by hand.
     public var gutter: CGFloat
     /// Reserved strip along the bottom for a caption or date.
     public var footerHeight: CGFloat
@@ -72,9 +65,8 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
             && photoWidth > 0
     }
 
-    /// How many rows the photos occupy. Ceiling division, so a template that
-    /// reached here without passing `TemplateImport.validate` still lays out
-    /// every photo it claims rather than dropping the last row.
+    /// Ceiling division, so a template that skipped `TemplateImport.validate`
+    /// still lays out every photo it claims, not dropping the last row.
     public var rows: Int {
         guard columns > 0 else { return 0 }
         return (frameCount + columns - 1) / columns
@@ -91,9 +83,8 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
         return (contentWidth - gutter * CGFloat(columns - 1)) / CGFloat(columns)
     }
 
-    /// The aspect every photo is cropped to. The live preview must be framed to
-    /// this, or the subject composes against the window while the strip uses
-    /// something narrower and the difference is lost with no warning.
+    /// The live preview must be framed to this, or the subject composes
+    /// against a window that crops differently than the strip does.
     public var photoAspect: CGFloat {
         photoHeight > 0 ? photoWidth / photoHeight : 1
     }
@@ -129,9 +120,8 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
         return CGRect(x: outerInset, y: outerInset, width: contentWidth, height: footerHeight)
     }
 
-    /// A copy with the style's set fields applied. Resolving overrides here is
-    /// what lets `StripRenderer` keep taking a finished template and never
-    /// learn that overrides exist.
+    /// Resolving overrides here is what lets `StripRenderer` keep taking a
+    /// finished template and never learn that overrides exist.
     public func applying(_ style: StripStyle?) -> StripTemplate {
         guard let style else { return self }
         var resolved = self
@@ -144,13 +134,8 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
         return resolved
     }
 
-    /// A copy under a new identity, for saving a strip's resolved look as a
-    /// template of its own. The geometry and the colours come along; only the
-    /// id and the name change.
-    ///
-    /// The id is always fresh. The file is the identity: saving twice gives two
-    /// templates, and updating one means re-importing the file that already
-    /// carries its id.
+    /// The id is always fresh — the file is the identity, so saving twice
+    /// gives two templates, and updating one means re-importing its file.
     public func derived(name: String) -> StripTemplate {
         var copy = self
         copy.id = "user-\(UUID().uuidString.lowercased())"
@@ -174,18 +159,9 @@ public struct StripTemplate: Equatable, Identifiable, Sendable {
     }
 }
 
-// MARK: - The file format
-
 extension StripTemplate: Codable {
-    /// Every key in a template file, and the whole of it. Hand-written for two
-    /// reasons.
-    ///
-    /// `CGSize` encodes itself as a bare `[144, 432]`, which in a file someone
-    /// is meant to edit is a coin flip between width and height, and a
-    /// transposed canvas renders a 6x2 strip that looks like a bug in the app.
-    /// And the defaults below are what let a hand-written template state only
-    /// its geometry and inherit the rest, which is the difference between a
-    /// format and a dump.
+    /// `CGSize` encodes itself as `[144, 432]`, a coin flip between width
+    /// and height in a file someone edits — named width/height avoids that.
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case id, name, frameCount, columns, canvasSize
         case outerInset, gutter, footerHeight, cornerRadius
@@ -238,9 +214,8 @@ extension StripTemplate: Codable {
         try container.encode(captionAlignment, forKey: .captionAlignment)
     }
 
-    /// Named width and height, or the `[width, height]` pair `CGSize` writes
-    /// for itself. The second form is what any other Swift program hands over,
-    /// so it is read rather than refused.
+    /// Reads either named width/height or the `[width, height]` pair
+    /// `CGSize` writes for itself, so another program's output still decodes.
     private static func decodeSize(
         from container: KeyedDecodingContainer<CodingKeys>
     ) throws -> CGSize {

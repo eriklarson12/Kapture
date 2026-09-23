@@ -17,8 +17,7 @@ struct RecipeRendererTests {
     }
 
     /// Sampled at the canvas's vertical centre, which for the classic strip
-    /// lands inside a photo. The test image is uniform top to bottom, so the
-    /// row does not matter beyond that.
+    /// lands inside a photo; the test image is uniform top to bottom either way.
     private func sample(_ strip: CGImage, x: Int) -> UInt8 {
         TestImage.red(strip, x: x, y: strip.height / 2)
     }
@@ -106,11 +105,8 @@ struct RecipeRendererTests {
         return (Int(pixels[offset]), Int(pixels[offset + 2]))
     }
 
-    // MARK: - Backdrop
-
     /// A stub segmenter, so every backdrop test asserts the compositing rather
-    /// than what Vision decided. The left half of each frame is the person,
-    /// which is also the black half of `TestImage.asymmetric()`.
+    /// than what Vision decided; the person half matches the black half of `TestImage.asymmetric()`.
     private func halfMasks() -> PersonMaskStore {
         PersonMaskStore(segment: { TestImage.mask(width: $0.width, height: $0.height) })
     }
@@ -158,9 +154,8 @@ struct RecipeRendererTests {
         return pixels[offset]
     }
 
-    /// The test that fails if only one of the two render paths is wired. A GIF
-    /// composited differently from the paper is the drift this project has
-    /// already been bitten by once.
+    /// Fails if only one of the two render paths is wired — a GIF composited
+    /// differently from the paper is a drift this project has already been bitten by.
     @Test("the backdrop reaches the animation frames the same way it reaches the paper")
     func renderFramesBackdrop() throws {
         try withStore { store in
@@ -204,9 +199,8 @@ struct RecipeRendererTests {
         }
     }
 
-    /// Deliberately unlike a missing *paper* picture, which refuses the strip.
-    /// The paper is the strip; a backdrop is a change of mind about one part of
-    /// it, and losing it must not lose the photographs.
+    /// Unlike a missing *paper* picture, which refuses the strip: a backdrop is
+    /// a change of mind about one part of it, so losing it must not lose the photographs.
     @Test("a backdrop naming a missing asset does not lose the strip")
     func missingBackdropAssetStillRenders() throws {
         try withStore { store in
@@ -241,9 +235,8 @@ struct RecipeRendererTests {
         }
     }
 
-    /// The mask comes off the stored frame, which is true optics, and the flip
-    /// happens to the finished composite. So the backdrop turns with the person
-    /// it is behind rather than staying put while they move.
+    /// The mask comes off the true-optics stored frame and the flip happens to
+    /// the finished composite, so the backdrop turns with the person behind it.
     @Test("a mirrored strip mirrors the backdrop with the person")
     func mirrorsBackdropWithThePerson() throws {
         try withStore { store in
@@ -327,8 +320,7 @@ struct RecipeRendererTests {
     func styleOverridesInset() throws {
         try withStore { store in
             // Unmirrored on purpose: the border is located by finding the test
-            // image's black left edge, so which way round the photo sits is
-            // part of the measurement and must not come from a default.
+            // image's black left edge, so orientation must not come from a default.
             var recipe = try store.save(
                 frames: asymmetricFrames(4),
                 templateID: BuiltInTemplates.classicStrip.id,
@@ -365,11 +357,8 @@ struct RecipeRendererTests {
         }
     }
 
-    // MARK: - Animation frames
-
     /// The classic strip's photo aspect is 1.39 against a 4:3 test frame, so
-    /// aspect-fill overflows vertically and the full source width survives.
-    /// Every sample below at a small x therefore reads the source's left edge.
+    /// aspect-fill overflows vertically and every sample at a small x reads the source's left edge.
     private func animationFrames(
         _ store: StripStore, _ recipe: StripRecipe
     ) throws -> [CGImage] {
@@ -439,9 +428,8 @@ struct RecipeRendererTests {
         }
     }
 
-    /// The bug this is most likely to have: reading `photoAspect` off the
-    /// template rather than off the template with the strip's own overrides
-    /// applied, so a GIF is framed differently from the paper it came from.
+    /// The likely bug: reading `photoAspect` off the bare template instead of
+    /// with the strip's overrides applied, framing a GIF differently from its paper.
     @Test("a style override changes the animation crop too")
     func renderFramesFollowsStyle() throws {
         try withStore { store in
@@ -457,10 +445,8 @@ struct RecipeRendererTests {
         }
     }
 
-    /// The reason user templates are kept on disk at all. A strip shot with
-    /// an imported template renders only if the renderer is handed a
-    /// catalogue that holds it; with the built-ins alone it is a strip that
-    /// stopped working at the next launch.
+    /// The reason user templates are kept on disk: a strip shot with an imported
+    /// template renders only if the renderer is handed a catalogue that holds it.
     @Test("a recipe naming a user template renders through the catalogue")
     func rendersThroughCatalogue() throws {
         try withStore { store in
@@ -490,9 +476,8 @@ struct RecipeRendererTests {
         }
     }
 
-    /// A stored frame is far more detail than a photo band at 300 dpi can
-    /// hold. Measured on a real strip, embedding the originals costs 12.6 MB
-    /// against 2.1 MB.
+    /// A stored frame is far more detail than a photo band at 300 dpi can hold;
+    /// on a real strip, embedding the originals costs 12.6 MB against 2.1 MB.
     @Test("resolving for print shrinks each frame to what the paper can hold")
     func resolveDownscalesForPrint() throws {
         try withStore { store in
@@ -504,10 +489,8 @@ struct RecipeRendererTests {
             let forPrint = try renderer.resolve(recipe, photoDPI: 300).frames[0]
 
             #expect(forPrint.width < native.width)
-            // Smaller, but still the size of the band it has to fill. The
-            // pixel of slack is `downscaled` rounding to whole pixels, which
-            // can land a fraction short of the band and is invisible at 300
-            // dpi.
+            // The pixel of slack is `downscaled` rounding to whole pixels,
+            // invisible at 300 dpi.
             let needed = template.photoWidth * template.scale(forDPI: 300)
             #expect(CGFloat(forPrint.width) >= needed - 1)
         }
@@ -544,11 +527,8 @@ struct RecipeRendererTests {
         }
     }
 
-    // MARK: - Face framing
-
     /// 16:9 frames with a red stripe down the leftmost tenth. The classic
-    /// strip's photo rect is narrower, so a centred crop loses the stripe and
-    /// a crop slid to the left keeps it.
+    /// strip's photo rect is narrower, so a centred crop loses it and a left-slid crop keeps it.
     private func stripedFrames(_ count: Int) -> [CaptureFrame] {
         (0..<count).map { CaptureFrame(index: $0, image: TestImage.edgeMarked()) }
     }

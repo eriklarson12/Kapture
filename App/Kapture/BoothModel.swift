@@ -34,73 +34,54 @@ final class BoothModel {
     let store: StripStore
     let templateStore: TemplateStore
     let runner: CaptureRunner
-    /// The hold between two strips in a queue. Lives here rather than in a
-    /// view because the key handling, the hint line and the inspector all read
-    /// it.
+    /// The hold between two strips in a queue. Lives here because the key handling,
+    /// the hint line and the inspector all read it.
     let restart = RestartTimer()
 
-    /// The user's imported templates, in name order. Held rather than read on
-    /// demand, because every preview render asks for a template and reading
-    /// files to answer would be absurd.
+    /// Held rather than read on demand, because every preview render asks for a
+    /// template and reading files to answer would be absurd.
     private(set) var userTemplates: [StripTemplate] = []
 
     private(set) var cameraStatus: CameraStatus = .starting
     private(set) var strip: RenderedStrip?
     private(set) var isBuilding = false
-    /// Which shot is being re-taken, so the viewport shows the camera rather
-    /// than the strip the user is standing in front of.
+    /// So the viewport shows the camera rather than the strip while retaking.
     private(set) var retakingFrame: Int?
     var isExporting = false
     /// A copy leaves no panel and no file, so the menu item says it happened
     /// for a moment. Nothing else would.
     var didCopy = false
     var errorMessage: String?
-    /// A one-line report of something that worked: a template saved, imported
-    /// or removed. Separate from `errorMessage`, which is titled as a failure
-    /// and would be the wrong frame for "Added a template".
+    /// Separate from `errorMessage`, which is titled as a failure and would be
+    /// the wrong frame for "Added a template".
     var notice: String?
     /// The template the editor is open on, if it is open. Nil dismisses it.
     var editingTemplate: TemplateEdit?
-    /// Fullscreen, no inspector, no buttons: the app pointed at a party rather
-    /// than at the person configuring it. Lives here because the View menu,
-    /// the layout and the key handling all read it.
-    ///
-    /// Leaving takes the queue with it. A booth that kept restarting behind an
-    /// inspector would discard whatever was being edited in it.
+    /// Lives here because the View menu, layout and key handling all read it.
+    /// Leaving kiosk stops the queue too, so it can't restart behind an open inspector.
     var isKiosk = false {
         didSet { if !isKiosk { stopQueue() } }
     }
 
-    /// Whether a finished strip starts the next run by itself. Off by default,
-    /// and kiosk-only: anywhere else this is a timer that throws away the strip
-    /// somebody is working on.
+    /// Off by default and kiosk-only: anywhere else this is a timer that throws
+    /// away the strip somebody is working on.
     var autoRestart = false
 
-    /// The caption every new strip is shot with, so a party is captioned once
-    /// rather than once per run. Each strip still stores its own text; this is
-    /// what a new one starts from.
+    /// So a party is captioned once rather than once per run. Each strip still
+    /// stores its own text; this is what a new one starts from.
     var standingCaption = ""
 
-    /// What goes behind the person on every strip shot after it, so a party is
-    /// set up once rather than once per run — the same rule as the caption.
-    ///
-    /// A picture is held as well as named, because an asset id belongs to one
-    /// strip's package (ADR-012). Carrying the id alone would give the next
-    /// strip a recipe naming a file that is not there; the image is what gets
-    /// copied into each new package instead.
+    /// A picture is held as well as named because an asset id belongs to one
+    /// strip's package (ADR-012); the image is what gets copied into each new one.
     var standingBackdrop: StripBackground?
     @ObservationIgnored var standingBackdropImage: CGImage?
 
-    /// Whether each new strip crops toward the faces in it. On for strips shot
-    /// from now; a strip already on disk has no such key and stays centred
-    /// (ADR-025). Standing, like the backdrop.
+    /// On for strips shot from now; a strip already on disk has no such key
+    /// and stays centred (ADR-025). Standing, like the backdrop.
     var standingFaceFraming = true
 
-    /// Whether the local server is up. Never on at launch: a booth that starts
-    /// serving photographs to a network nobody asked it to join is not a
-    /// default anyone would choose.
-    ///
-    /// These four are written by `StripSharing.swift` and read everywhere else.
+    /// Never on at launch: serving photographs to a network nobody asked to join
+    /// isn't a default anyone would choose. Written by `StripSharing.swift`.
     var isSharing = false
     var shareURL: URL?
     var shareQR: CGImage?
@@ -113,17 +94,15 @@ final class BoothModel {
     @ObservationIgnored var shareToken: ShareToken?
     @ObservationIgnored var sharedRecipe: UUID?
 
-    /// Guards against an out-of-order render. Dragging a colour emits a stream
-    /// of edits, and a slow render landing after a fast one would show a strip
-    /// that no longer matches the recipe.
+    /// Guards against an out-of-order render: dragging a colour emits a stream of
+    /// edits, and a slow one landing after a fast one would show a stale strip.
     @ObservationIgnored private var renderGeneration = 0
 
     /// The running queue, held so anything can stop it.
     @ObservationIgnored private var queue: Task<Void, Never>?
 
-    /// The template owns the shot count. Letting the sequence carry a second,
-    /// independent count is how you get a three-shot run rendered into a
-    /// four-frame strip, which the renderer rightly refuses.
+    /// The template owns the shot count; a sequence with its own independent
+    /// count is how a three-shot run ends up rendered into a four-frame strip.
     var templateID = BuiltInTemplates.classicStrip.id {
         didSet { sequence.frameCount = template.frameCount }
     }
@@ -132,9 +111,8 @@ final class BoothModel {
         didSet { runner.sequence = sequence }
     }
 
-    /// The built-ins plus the user's, which is the one lookup every render
-    /// path takes. A strip shot with an imported template renders only
-    /// because this is what reaches `RecipeRenderer` (ADR-014).
+    /// The one lookup every render path takes; a strip shot with an imported
+    /// template renders only because this is what reaches `RecipeRenderer` (ADR-014).
     var templates: [String: StripTemplate] {
         TemplateStore.catalogue(with: userTemplates)
     }
@@ -145,16 +123,14 @@ final class BoothModel {
         BuiltInTemplates.all + userTemplates
     }
 
-    /// The one renderer the app builds. Every export path used to construct
-    /// its own with the built-ins only, which is the bug an imported template
-    /// would have found on the next launch.
+    /// The one renderer the app builds; every export path used to construct its own
+    /// with the built-ins only, a bug an imported template found on the next launch.
     var renderer: RecipeRenderer {
         RecipeRenderer(store: store, templates: templates, masks: masks, faces: faces)
     }
 
-    /// One set of person masks for the whole app. Every export path already
-    /// goes through `renderer`, so the preview, the PNG, the GIF, the movie,
-    /// the PDF and the print job all share it and a frame is segmented once.
+    /// One set of person masks for the whole app: every export path goes through
+    /// `renderer`, so all outputs share it and a frame is segmented once.
     @ObservationIgnored private let masks = PersonMaskStore()
     /// Faces found once per frame, for the same reason.
     @ObservationIgnored private let faces = FaceStore()
@@ -165,9 +141,8 @@ final class BoothModel {
         templates[templateID] ?? BuiltInTemplates.classicStrip
     }
 
-    /// The template as the shown strip actually renders it: the base template
-    /// with this strip's overrides applied. The inspector displays these values,
-    /// so an untouched control shows what the template gives rather than blank.
+    /// The base template with this strip's overrides applied, so an untouched
+    /// inspector control shows what the template gives rather than blank.
     var shownTemplate: StripTemplate {
         let base = templates[strip?.recipe.templateID ?? templateID]
             ?? BuiltInTemplates.classicStrip
@@ -218,9 +193,8 @@ final class BoothModel {
         }
     }
 
-    /// Re-reads the user's templates after one is saved, imported or removed.
-    /// The catalogue is derived from them, so this is the only thing that has
-    /// to be refreshed.
+    /// The catalogue is derived from these, so this is the only thing that
+    /// has to be refreshed after a save, import or removal.
     func reloadTemplates() {
         do {
             userTemplates = try templateStore.load()
@@ -258,12 +232,8 @@ final class BoothModel {
         await buildStrip()
     }
 
-    /// Starts a queue: a strip, a hold, the next strip, until somebody stops
-    /// it. Called during a hold it cancels that hold and shoots now, so one key
-    /// still covers both cases.
-    ///
-    /// Without auto-restart this runs exactly once, which is what the shutter
-    /// button has always done.
+    /// Called during a hold, this cancels that hold and shoots now, so one key
+    /// covers both cases. Without auto-restart it runs exactly once.
     func startQueue() {
         queue?.cancel()
         restart.stop()
@@ -280,9 +250,8 @@ final class BoothModel {
     private func runQueue() async {
         repeat {
             await capture()
-            // A failure ends the queue. Counting down into a camera that has
-            // just failed is a loop that redraws the same error for ever, and
-            // the person who could fix it has been given no gap to do it in.
+            // A failure ends the queue: counting down into a failed camera would
+            // just redraw the same error forever, with no gap to fix it.
             guard isKiosk, autoRestart, strip != nil, errorMessage == nil,
                   !Task.isCancelled else { return }
         } while await restart.wait() == .fired
@@ -315,12 +284,8 @@ final class BoothModel {
         await restyle { $0.faceFraming = on }
     }
 
-    /// Copies a picture into the strip's own package and paints it behind the
-    /// person (ADR-012).
-    ///
-    /// Fitted to the photo band rather than to the canvas, which is what
-    /// `setBackgroundImage` does: a backdrop is composited inside one
-    /// photograph, not painted across the paper.
+    /// Fitted to the photo band, not the canvas — unlike `setBackgroundImage`,
+    /// a backdrop composites inside one photograph, not across the paper.
     func setBackdropImage(_ image: CGImage) async {
         guard let current = strip else { return }
         do {
@@ -356,9 +321,8 @@ final class BoothModel {
         await restyle { $0.templateID = id }
     }
 
-    /// The one path from an edited recipe to a visible, saved strip. Items 2.1,
-    /// 2.2, 2.3, 2.4 and 2.6 all route through here, so there is a single place
-    /// that knows how to re-render and persist.
+    /// The one path from an edited recipe to a visible, saved strip — the single
+    /// place that knows how to re-render and persist.
     func restyle(_ mutate: (inout StripRecipe) -> Void) async {
         guard let current = strip else { return }
         var recipe = current.recipe
@@ -367,10 +331,8 @@ final class BoothModel {
         await present(recipe, persisting: true)
     }
 
-    /// Re-shoots one photo of the shown strip, leaving the other three alone.
-    ///
-    /// The package is rewritten by `replaceFrame` rather than by `present`,
-    /// because the new frame has to reach disk before a recipe can name it.
+    /// Rewritten by `replaceFrame` rather than `present`, because the new
+    /// frame has to reach disk before a recipe can name it.
     func retakeFrame(_ index: Int) async {
         guard let current = strip, retakingFrame == nil else { return }
         errorMessage = nil
@@ -389,9 +351,8 @@ final class BoothModel {
         }
     }
 
-    /// Copies a picture into the strip's own package and points the background
-    /// at it (ADR-012). Copied rather than referenced, so moving or deleting
-    /// the original cannot break a strip that already exists.
+    /// Copied rather than referenced (ADR-012), so moving or deleting the
+    /// original cannot break a strip that already exists.
     func setBackgroundImage(_ image: CGImage) async {
         guard let current = strip else { return }
         do {
@@ -409,11 +370,8 @@ final class BoothModel {
         }
     }
 
-    /// Renders the shown strip again without changing its recipe.
-    ///
-    /// A template edit changes what a recipe *means* rather than what it says,
-    /// so `restyle` sees no difference and returns early. Nothing is persisted:
-    /// the recipe on disk is already correct.
+    /// A template edit changes what a recipe *means*, not what it says, so
+    /// `restyle` sees no difference. Nothing is persisted: disk is already correct.
     func refreshStrip() async {
         guard let recipe = strip?.recipe else { return }
         await present(recipe, persisting: false)
@@ -431,8 +389,8 @@ final class BoothModel {
             if persisting { try store.update(recipe) }
             strip = RenderedStrip(recipe: recipe, image: image)
         } catch {
-            // The previously shown strip stays up. Blanking the viewport on a
-            // failed edit would lose work that is still on disk.
+            // The previously shown strip stays up; blanking on a failed edit
+            // would lose work that is still on disk.
             errorMessage = error.localizedDescription
         }
     }
@@ -446,34 +404,24 @@ final class BoothModel {
                 frames: runner.frames,
                 templateID: templateID,
                 caption: trimmed.isEmpty ? nil : standingCaption,
-                // A picture is attached afterwards, once there is a package to
-                // copy it into. Writing the standing id here would name an
-                // asset belonging to the strip it was chosen on.
+                // Attached afterwards, once there is a package to copy it into —
+                // writing the standing id here would name an asset from a different strip.
                 backdrop: standingBackdropImage == nil ? standingBackdrop : nil,
                 faceFraming: standingFaceFraming
             )
             recipe = try carryBackdropPicture(onto: recipe)
             let image = try await render(recipe, scale: Self.previewScale)
             strip = RenderedStrip(recipe: recipe, image: image)
-            // The previous link is withdrawn here rather than when the run
-            // started, so a guest scanning at the end of a hold keeps the whole
-            // of the next run to finish.
+            // Withdrawn here, not when the run started, so a guest scanning at
+            // the end of a hold keeps the whole next run to finish.
             share(recipe)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    /// Copies the standing picture into this strip's own package and repoints
-    /// the recipe at the copy.
-    ///
-    /// The id the standing backdrop carries names an asset inside the strip it
-    /// was chosen on. Written into a second strip it would name a file that is
-    /// not there, so every strip gets its own copy and stays a folder that can
-    /// be handed to someone (ADR-011, ADR-012).
-    ///
-    /// The asset is written before the recipe that names it, which is the order
-    /// `StripStore.replaceFrame` already keeps.
+    /// The standing backdrop's id names an asset inside the strip it was chosen
+    /// on, so every strip needs its own copy to stay a self-contained folder (ADR-011, ADR-012).
     private func carryBackdropPicture(onto recipe: StripRecipe) throws -> StripRecipe {
         guard case .image = standingBackdrop, let picture = standingBackdropImage else {
             return recipe

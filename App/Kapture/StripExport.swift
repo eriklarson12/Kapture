@@ -2,9 +2,8 @@ import AppKit
 import KaptureKit
 import UniformTypeIdentifiers
 
-/// Export policy: what each file is called, how big it is, and how fast it
-/// plays. Every format shares one timestamp, so a strip's PNG, GIF, movie and
-/// PDF sort together in a folder.
+/// Every format shares one timestamp, so a strip's PNG, GIF, movie and PDF
+/// sort together in a folder.
 enum StripExport {
     /// Print resolution. The classic strip at 300 dpi is 600x1800 pixels,
     /// which is a true 2x6 inches.
@@ -20,17 +19,12 @@ enum StripExport {
     static let movieHeight: CGFloat = 1080
     static let movieSecondsPerFrame: Double = 0.8
 
-    /// The photographs are embedded in a PDF at the resolution the paper can
-    /// hold. Higher buys nothing a printer can use: a real four-shot strip is
-    /// 12.6 MB with the stored frames embedded and 2.1 MB at 300 dpi.
+    /// Higher buys nothing a printer can use: a real four-shot strip is 12.6 MB
+    /// with the stored frames embedded and 2.1 MB at 300 dpi.
     static let pdfPhotoDPI: CGFloat = 300
 
-    /// The print job's settings, inherited from whatever the user has set up
-    /// and then pinned where the strip's size depends on it.
-    ///
     /// `scalingFactor` is the one value that must stay at 1. Anything else and
-    /// the strip stops being two inches wide, which no part of the app can
-    /// detect and only a ruler on a finished print will show.
+    /// the strip stops being two inches wide, and only a ruler will show it.
     static func printInfo(pageSize: CGSize) -> NSPrintInfo {
         let inherited = NSPrintInfo.shared.dictionary() as? [NSPrintInfo.AttributeKey: Any]
         let info = inherited.map(NSPrintInfo.init(dictionary:)) ?? NSPrintInfo()
@@ -54,9 +48,8 @@ enum StripExport {
 }
 
 extension BoothModel {
-    /// Renders the strip again at print resolution and writes it where the user
-    /// chooses. The preview render is thrown away rather than upscaled, which
-    /// is the whole point of storing a recipe instead of a raster.
+    /// The preview render is thrown away rather than upscaled, which is the
+    /// whole point of storing a recipe instead of a raster.
     func exportStrip() async {
         guard let strip else { return }
         guard let url = await save(
@@ -137,9 +130,8 @@ extension BoothModel {
         }
     }
 
-    /// The strip as a page rather than as pixels. A PNG asks to be printed at
-    /// 2x6 inches through metadata some print paths ignore; a PDF's page box
-    /// measures two inches by six and cannot be read any other way.
+    /// A PNG asks to be printed at 2x6 inches through metadata some print paths
+    /// ignore; a PDF's page box measures two by six and can't be read any other way.
     func exportPDF() async {
         guard let strip else { return }
         guard let url = await save(
@@ -163,12 +155,8 @@ extension BoothModel {
         }
     }
 
-    /// The strip on the pasteboard, PNG first.
-    ///
-    /// A consumer takes the first declared type it understands. A strip is a
-    /// photograph, so PNG is the flavour that behaves the same in Mail, in
-    /// Messages and in a document; the PDF is there for anything that asks for
-    /// something it can scale.
+    /// A consumer takes the first declared type it understands, so PNG (a
+    /// photograph) goes first; PDF is there for anything that asks to scale.
     func copyStrip() async {
         guard let strip else { return }
         isExporting = true

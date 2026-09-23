@@ -1,9 +1,7 @@
 import Foundation
 
-/// A moment in a run worth marking out loud.
-///
-/// The driver names the moment; what it sounds like, and whether anything is
-/// heard at all, is decided elsewhere.
+/// A moment in a run worth marking out loud. The driver names the moment;
+/// what it sounds like is decided elsewhere.
 public enum CaptureCue: String, CaseIterable, Equatable, Sendable {
     /// One second of the countdown has gone by.
     case tick
