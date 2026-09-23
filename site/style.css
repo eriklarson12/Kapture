@@ -1,0 +1,215 @@
+/* Tokens from docs/design-system.md. The page is achromatic; colour comes only from the screenshots. */
+:root {
+  --shell-0: #0E0E0F;
+  --shell-1: #161618;
+  --shell-2: #1F1F22;
+  --shell-3: #2B2B2F;
+  --shell-4: #3D3D42;
+  --ink-hi: #F2F2F3;
+  --ink-mid: #A8A8AD;
+  --ink-lo: #6E6E75;
+  --radius: 12px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--shell-0);
+  color: var(--ink-hi);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+img { display: block; max-width: 100%; height: auto; }
+
+.wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 0 24px;
+}
+
+section { margin-top: 96px; }
+
+h1, h2, h3 { margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 22px; font-weight: 600; margin-bottom: 24px; }
+h3 { font-size: 15px; font-weight: 600; }
+
+.quiet { color: var(--ink-mid); text-decoration: none; }
+.quiet:hover { color: var(--ink-hi); }
+
+.fine { color: var(--ink-mid); font-size: 13px; }
+
+/* Header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Hero */
+
+.hero {
+  margin-top: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.hero-icon { margin-bottom: 20px; }
+
+h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 16px 0 32px;
+  color: var(--ink-mid);
+  font-size: 19px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.button {
+  display: inline-block;
+  padding: 14px 24px;
+  border-radius: 10px;
+  background: var(--ink-hi);
+  color: var(--shell-0);
+  font-weight: 600;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.button:hover { background: #FFFFFF; }
+.button:focus-visible, .quiet:focus-visible {
+  outline: 2px solid var(--ink-hi);
+  outline-offset: 3px;
+}
+
+.hero .fine { margin-top: 16px; }
+
+.hero-media {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22%;
+  gap: 20px;
+  align-items: center;
+}
+
+/* Images */
+
+.shot, .strip { margin: 0; }
+
+.shot img {
+  border-radius: var(--radius);
+}
+
+.strip img {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Features */
+
+.features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.features li {
+  background: var(--shell-1);
+  border: 1px solid var(--shell-3);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.features p {
+  margin: 8px 0 0;
+  color: var(--ink-mid);
+  font-size: 15px;
+}
+
+/* Gallery */
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.gallery figure { margin: 0; }
+
+figcaption {
+  margin-top: 12px;
+  color: var(--ink-mid);
+  font-size: 15px;
+}
+
+/* First launch */
+
+.note {
+  max-width: 640px;
+  border: 1px solid var(--shell-3);
+  border-radius: var(--radius);
+  padding: 32px;
+}
+
+.note h2 { margin-bottom: 12px; }
+.note p { margin: 0; color: var(--ink-mid); }
+.note ol { margin: 16px 0; padding-left: 20px; }
+.note li { margin: 6px 0; }
+.note .fine { margin: 0; }
+
+/* Footer */
+
+.footer {
+  margin-top: 96px;
+  padding-top: 24px;
+  padding-bottom: 48px;
+  border-top: 1px solid var(--shell-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  color: var(--ink-mid);
+  font-size: 13px;
+}
+
+.footer nav { display: flex; gap: 20px; }
+
+/* Narrow screens */
+
+@media (max-width: 720px) {
+  .wrap { padding: 0 16px; }
+  section { margin-top: 64px; }
+  .hero { grid-template-columns: 1fr; gap: 40px; margin-top: 24px; }
+  .hero-icon { width: 80px; height: 80px; }
+  .actions { flex-direction: column; align-items: stretch; gap: 16px; text-align: center; }
+  .features, .gallery { grid-template-columns: 1fr; }
+  .note { padding: 24px; }
+}
