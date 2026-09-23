@@ -28,6 +28,20 @@ Layouts are measured in points (1/72 inch). Resolution is only chosen at render 
 
 ## Installation & Setup
 
+### Download
+
+Download the latest `Kapture-<version>.dmg` from [Releases](https://github.com/eriklarson12/Kapture/releases/latest). Open it and drag Kapture into Applications. Requires macOS 14 or later, on Apple silicon or Intel.
+
+Kapture is free and not notarized by Apple, so macOS blocks it the first time:
+
+1. Open Kapture and click **Done** on the warning.
+2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Kapture.
+3. Open Kapture again and confirm.
+
+This is only needed once per version. Each new version also asks for camera access again.
+
+### Build from Source
+
 Requirements:
 
 - macOS 14 or later

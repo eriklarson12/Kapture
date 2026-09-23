@@ -23,3 +23,7 @@ docs/
 tasks/
 .claude/
 CLAUDE.md
+
+# Release output
+build/
+dist/
