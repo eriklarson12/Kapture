@@ -3,7 +3,11 @@ import SwiftUI
 @main
 struct KaptureApp: App {
     /// Held here rather than in `ContentView` so the File menu can reach it.
+    #if DEBUG
+    @State private var model = BoothModel(root: DemoMode.root ?? .kaptureSupportDirectory)
+    #else
     @State private var model = BoothModel()
+    #endif
     /// Only so a template double-clicked in Finder has somewhere to land.
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 

@@ -22,7 +22,13 @@ enum CameraStatus: Equatable {
 @MainActor
 @Observable
 final class BoothModel {
+    #if DEBUG
+    let camera: any CameraSource = DemoMode.root.map {
+        DemoCamera(directory: $0.appending(path: "Photos", directoryHint: .isDirectory))
+    } ?? AVFoundationCamera()
+    #else
     let camera = AVFoundationCamera()
+    #endif
     /// Built before the runner, because the runner is handed it.
     let sounds = BoothSounds()
     let store: StripStore

@@ -20,6 +20,9 @@ struct ContentView: View {
             }
         }
         .kiosk(isOn: $model.isKiosk)
+        #if DEBUG
+        .task { await DemoMode.play(model) }
+        #endif
         // A sheet rather than more inspector: the inspector edits this strip,
         // and the editor edits a file that every strip naming it will follow.
         .sheet(item: $model.editingTemplate) { edit in

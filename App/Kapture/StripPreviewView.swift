@@ -11,7 +11,12 @@ struct StripPreviewView: View {
             .resizable()
             .interpolation(.high)
             .aspectRatio(contentMode: .fit)
-            .padding(24)
+            .padding([.top, .horizontal], 24)
+            .padding(.bottom, Self.controlsClearance)
             .accessibilityLabel("Photo strip preview")
     }
+
+    /// The run controls overlay the viewport's bottom edge: a 44pt row on 24pt
+    /// of padding. The strip MUST stop above them, or they sit on its caption.
+    private static let controlsClearance: CGFloat = 24 + 44 + 24
 }

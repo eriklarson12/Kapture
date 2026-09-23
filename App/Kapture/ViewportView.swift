@@ -81,11 +81,24 @@ struct ViewportView: View {
             ProgressView()
                 .controlSize(.small)
         case .live:
-            CameraPreview(session: model.camera.session)
+            preview
                 .modifier(PhotoFraming(aspect: model.template.photoAspect))
         case .failed(let message):
             notice(title: "Camera unavailable", detail: message)
         }
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        #if DEBUG
+        if let demo = model.camera as? DemoCamera {
+            DemoPreview(camera: demo)
+        } else if let camera = model.camera as? AVFoundationCamera {
+            CameraPreview(session: camera.session)
+        }
+        #else
+        CameraPreview(session: model.camera.session)
+        #endif
     }
 
     /// Camera and export failures are shown as text, never swallowed.
