@@ -2,6 +2,8 @@
 
 Take a sequence of photos with your camera and get a classic photo strip on macOS.
 
+Website: [trykapture.vercel.app](https://trykapture.vercel.app)
+
 Built with Swift, SwiftUI, and AVFoundation, with no third-party dependencies.
 
 ## Features
@@ -67,4 +69,4 @@ The Xcode project is generated from `project.yml` and is not committed. Edit bui
 
 ## License
 
-MIT
+[MIT](LICENSE)
