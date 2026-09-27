@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: swift build
+      - run: swift test
+
+  app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: brew install xcodegen
+      # The project is gitignored, so it MUST be generated before xcodebuild.
+      - run: xcodegen generate
+      - run: >
+          xcodebuild -project Kapture.xcodeproj -scheme Kapture
+          -configuration Debug CODE_SIGNING_ALLOWED=NO build
